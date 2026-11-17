@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import streamlit as st
 
@@ -58,6 +59,8 @@ for key, value in {
     "pay_error": "",
     "report_id": None,
     "last_code": "",
+    "buy_plan": "",
+    "manual_order_no": "",
 }.items():
     ss.setdefault(key, value)
 
@@ -310,7 +313,12 @@ def render_plan_cards() -> None:
                         f'<div class="plan-desc">{plan["desc"]}</div></div>',
                         unsafe_allow_html=True,
                     )
-                    label = "立即购买" if gateway_ready() else "联系客服"
+                    if gateway_ready():
+                        label = "立即购买"
+                    elif settings.alipay_qr:
+                        label = "扫码购买"
+                    else:
+                        label = "联系客服"
                     if st.button(
                         label,
                         key=f"buy_{plan['id']}",
@@ -319,6 +327,9 @@ def render_plan_cards() -> None:
                     ):
                         if gateway_ready():
                             start_order(plan)
+                        elif settings.alipay_qr:
+                            ss["buy_plan"] = plan["id"]
+                            goto("buy")
                         else:
                             st.info(settings.support_text)
 
@@ -421,6 +432,74 @@ def payment_watcher(order_no: str) -> None:
         _app_rerun()
 
 
+def render_manual_pay() -> None:
+    """支付宝个人收款码：扫码付款 → 提交订单 → 后台补单发码 → 用户凭订单号查询。"""
+    plans = {p["id"]: p for p in PLANS}
+    ids = list(plans)
+    chosen = ss.get("buy_plan") or ids[0]
+    index = ids.index(chosen) if chosen in ids else 0
+
+    with st.container(border=True):
+        st.markdown('<div class="card-title"><span class="dot"></span>支付宝扫码付款</div>', unsafe_allow_html=True)
+        left, right = st.columns([1, 1.35], gap="large")
+        with left:
+            qr = settings.alipay_qr
+            if qr.startswith("http"):
+                st.image(qr, width=210)
+            elif Path(qr).exists():
+                st.image(qr, width=210)
+            else:
+                st.warning("收款码未就绪：请把图片放到 assets/alipay_qr.png，或在 Secrets 配置 ALIPAY_QR")
+            st.caption("付款时在备注里写上你的微信名或手机尾号，方便对账")
+        with right:
+            plan_id = st.selectbox(
+                "选择套餐",
+                ids,
+                index=index,
+                format_func=lambda x: f"{plans[x]['name']} · ¥{yuan(plans[x]['price'])} · {plans[x]['uses']} 次",
+            )
+            unpaid_note = st.text_input(
+                "付款备注 / 联系方式", placeholder="例如：微信 wxid_abc 或 手机尾号 8899", key="manual_contact"
+            )
+            st.caption(f"扫码支付 ¥{yuan(plans[plan_id]['price'])}，金额与所选套餐保持一致")
+            if st.button("我已付款，提交订单", type="primary", width="stretch"):
+                note = unpaid_note.strip()
+                if not note:
+                    st.error("请先填写付款备注或联系方式，方便客服核对")
+                else:
+                    plan = plans[plan_id]
+                    no = store.create_order(plan["id"], plan["name"], plan["price"], plan["uses"], "alipay_qr", note)
+                    ss["manual_order_no"] = no
+                    st.rerun()
+
+        if ss.get("manual_order_no"):
+            st.success("订单已提交，客服核对到账后会自动发码")
+            st.code(ss["manual_order_no"], language=None)
+            st.caption(f"把订单号和付款截图发客服（{settings.support_text}），一般几分钟内处理完成")
+
+        st.markdown("---")
+        st.markdown('<div class="card-title"><span class="dot"></span>已付款？用订单号查兑换码</div>', unsafe_allow_html=True)
+        query = st.text_input("订单号", key="order_query", placeholder="粘贴订单号，例如 R20261117XXXX")
+        if st.button("查询订单", width="stretch"):
+            order = store.get_order(query.strip())
+            if not order:
+                st.error("订单号不存在，请检查后重试")
+            elif order["status"] == "paid" and order["code"]:
+                st.success("已确认到账，兑换码如下")
+                st.code(order["code"], language=None)
+                if st.button("激活并开始使用", type="primary", width="stretch", key="activate_from_order"):
+                    result = store.activate(order["code"], ss.token or "")
+                    if result.ok:
+                        ss.token = result.token
+                        qp_set("k", result.token)
+                        ss.last_code = order["code"]
+                        goto("use")
+                    else:
+                        st.error(result.message)
+            else:
+                st.info("订单还在等待确认，付款后请联系客服催单")
+
+
 def render_buy_page() -> None:
     st.markdown('<div class="sec-title">购买次数</div>', unsafe_allow_html=True)
     st.markdown(
@@ -436,7 +515,10 @@ def render_buy_page() -> None:
         )
 
     if not gateway_ready():
-        st.warning("在线支付通道尚未开通，可直接联系客服购买兑换码。")
+        if settings.alipay_qr:
+            render_manual_pay()
+        else:
+            st.warning("在线支付通道尚未开通，可直接联系客服购买兑换码。")
     else:
         st.radio(
             "支付方式",
@@ -870,6 +952,7 @@ def render_admin() -> None:
                     "金额": yuan(o["amount"]),
                     "次数": o["uses"],
                     "状态": "已支付" if o["status"] == "paid" else "待支付",
+                    "备注": o.get("remark") or "",
                     "兑换码": o["code"] or "",
                     "创建时间": o["created_at"],
                     "支付时间": o["paid_at"] or "",

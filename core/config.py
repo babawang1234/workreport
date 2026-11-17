@@ -61,6 +61,7 @@ class Settings:
     epay_url: str
     epay_pid: str
     epay_key: str
+    alipay_qr: str
 
 
 @lru_cache(maxsize=1)
@@ -82,6 +83,7 @@ def get_settings() -> Settings:
         epay_url=_secret("EPAY_URL"),
         epay_pid=_secret("EPAY_PID"),
         epay_key=_secret("EPAY_KEY"),
+        alipay_qr=_secret("ALIPAY_QR"),
     )
 
 

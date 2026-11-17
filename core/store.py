@@ -348,13 +348,25 @@ def _new_order_no() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S") + str(secrets.randbelow(9000) + 1000)
 
 
-def create_order(plan_id: str, plan_name: str, amount_cents: int, uses: int, channel: str = "alipay") -> str:
+def create_order(
+    plan_id: str, plan_name: str, amount_cents: int, uses: int, channel: str = "alipay", remark: str = ""
+) -> str:
     order_no = _new_order_no()
     with _conn() as conn:
         conn.execute(
-            "INSERT INTO orders (order_no, plan_id, plan_name, amount, uses, channel, status, created_at)"
-            " VALUES (?,?,?,?,?,?,'pending',?)",
-            (order_no, plan_id, plan_name, int(amount_cents), int(uses), channel, _now()),
+            "INSERT INTO orders (order_no, plan_id, plan_name, amount, uses, channel, status, created_at, remark)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                order_no,
+                plan_id,
+                plan_name,
+                int(amount_cents),
+                int(uses),
+                channel,
+                "pending",
+                _now(),
+                remark,
+            ),
         )
     _log(None, "create_order", f"{order_no} {plan_name} {amount_cents}")
     return order_no
