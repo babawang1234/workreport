@@ -56,6 +56,10 @@ git push -u origin main
    ```
 3. `Deploy`，等 2~3 分钟，得到 `https://xxx.streamlit.app` 公网链接 —— 手机、电脑直接打开即可。
 
+> **零成本模型**：智谱开放平台的 `GLM-4.7-Flash` 目前免费（200K 上下文），OpenAI 兼容接口：
+> `LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"`、`LLM_MODEL = "glm-4.7-flash"`。
+> 免费模型有并发和速率限制，单量起来后建议换成付费模型（DeepSeek / 通义，成本仍然很低）。
+
 ### 4. 上线自检
 
 - 进侧边栏「🔐 管理后台」→ 生成一个测试码 → 激活 → 生成一份报告。
