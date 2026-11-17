@@ -44,6 +44,14 @@ def _secret(name: str, default: str = "") -> str:
     return default
 
 
+def _default_qr() -> str:
+    """未配置 ALIPAY_QR 时，若仓库内有收款码图片则直接使用。"""
+    for name in ("alipay_qr.png", "alipay_qr.jpg"):
+        if (ROOT_DIR / "assets" / name).exists():
+            return f"assets/{name}"
+    return ""
+
+
 @dataclass(frozen=True)
 class Settings:
     api_key: str
@@ -83,7 +91,7 @@ def get_settings() -> Settings:
         epay_url=_secret("EPAY_URL"),
         epay_pid=_secret("EPAY_PID"),
         epay_key=_secret("EPAY_KEY"),
-        alipay_qr=_secret("ALIPAY_QR"),
+        alipay_qr=_secret("ALIPAY_QR") or _default_qr(),
     )
 
 
