@@ -486,26 +486,29 @@ def render_manual_pay() -> None:
         st.markdown('<div class="card-title"><span class="dot"></span>已付款？用订单号查兑换码</div>', unsafe_allow_html=True)
         query = st.text_input("订单号", key="order_query", placeholder="粘贴订单号，例如 R20261117XXXX")
         if st.button("查询订单", width="stretch"):
-            order = store.get_order(query.strip())
-            if not order:
-                st.error("订单号不存在，请检查后重试")
-            elif order["status"] == "paid" and order["code"]:
-                st.success("已确认到账，兑换码如下")
-                st.code(order["code"], language=None)
-                if st.button("激活并开始使用", type="primary", width="stretch", key="activate_from_order"):
-                    result = store.activate(order["code"], ss.token or "")
-                    if result.ok:
-                        ss.token = result.token
-                        qp_set("k", result.token)
-                        ss.last_code = order["code"]
-                        goto("use")
-                    else:
-                        st.error(result.message)
-            else:
-                if settings.support_wechat:
-                    st.info(f"订单还在等待确认，可加微信 {settings.support_wechat} 催单")
+            ss["order_lookup"] = query.strip()
+
+        looked_up = ss.get("order_lookup") or ""
+        order = store.get_order(looked_up) if looked_up else None
+        if looked_up and not order:
+            st.error("订单号不存在，请检查后重试")
+        elif order and order["status"] == "paid" and order["code"]:
+            st.success("已确认到账，兑换码如下")
+            st.code(order["code"], language=None)
+            if st.button("激活并开始使用", type="primary", width="stretch", key="activate_from_order"):
+                result = store.activate(order["code"], ss.token or "")
+                if result.ok:
+                    ss.token = result.token
+                    qp_set("k", result.token)
+                    ss.last_code = order["code"]
+                    goto("use")
                 else:
-                    st.info("订单还在等待确认，付款后请联系客服催单")
+                    st.error(result.message)
+        elif order:
+            if settings.support_wechat:
+                st.info(f"订单还在等待确认，可加微信 {settings.support_wechat} 催单")
+            else:
+                st.info("订单还在等待确认，付款后请联系客服催单")
 
 
 def render_buy_page() -> None:
