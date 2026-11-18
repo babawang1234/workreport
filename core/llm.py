@@ -74,6 +74,6 @@ def stream_chat(messages: list[dict[str, str]], *, temperature: float | None = N
             raise
         except Exception as exc:  # noqa: BLE001 - 统一转成可读提示
             raise LLMError(_friendly(exc)) from exc
-        if produced or finish != "length" or attempt == 1 or budget >= 16384:
+        if produced or finish != "length" or attempt == 1:
             return
-        budget = min(budget * 2, 16384)
+        budget = 16384

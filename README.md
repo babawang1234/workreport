@@ -157,7 +157,7 @@ docker compose up -d --build
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
 | `LLM_API_KEY / LLM_BASE_URL / LLM_MODEL` | 模型接入（OpenAI 兼容） | `deepseek-chat` |
-| `LLM_TEMPERATURE / LLM_MAX_TOKENS` | 输出风格与长度上限（推理模型如 glm-5.3-flash 建议 8192；预算被推理耗尽时会自动加倍重试一次） | `0.5 / 2400` |
+| `LLM_TEMPERATURE / LLM_MAX_TOKENS` | 输出风格与长度上限（推理模型如 glm-5.3-flash 请设 16384；预算被推理耗尽时会自动用 16384 重试一次） | `0.5 / 2400` |
 | `DATABASE_URL` | 云 Postgres 连接串；留空则用本地 SQLite | 空 |
 | `SITE_URL` | 站点公网地址（支付回跳） | `http://localhost:8501` |
 | `EPAY_URL / EPAY_PID / EPAY_KEY` | 在线支付，留空则关闭 | — |
