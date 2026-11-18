@@ -56,8 +56,9 @@ git push -u origin main
    ```
 3. `Deploy`，等 2~3 分钟，得到 `https://xxx.streamlit.app` 公网链接 —— 手机、电脑直接打开即可。
 
-> **零成本模型**：智谱开放平台的 `GLM-4.7-Flash` 目前免费（200K 上下文），OpenAI 兼容接口：
-> `LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"`、`LLM_MODEL = "glm-4.7-flash"`。
+> **零成本模型**：智谱开放平台的 Flash 系列目前免费额度较高（200K 上下文），OpenAI 兼容接口：
+> `LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"`、`LLM_MODEL = "glm-5.3-flash"`。
+> 这类模型是推理模型，务必再加一行 `LLM_MAX_TOKENS = "16384"`，否则推理过程会耗尽预算、正文为空。
 > 免费模型有并发和速率限制，单量起来后建议换成付费模型（DeepSeek / 通义，成本仍然很低）。
 
 ### 4. 上线自检
@@ -106,7 +107,7 @@ docker compose up -d --build
    ```
 3. 重启服务。用户在「购买次数」页选套餐 → 跳收银台付款 → 页面每 8 秒自动查单，支付成功即自动发码并激活（**不依赖异步回调**，所以不需要公网 webhook）。
 
-没有支付资质也能卖：把 `SUPPORT_TEXT` 改成你的客服微信，用户看到的是「联系客服购买」，你在后台生成兑换码发给对方即可。
+没有支付资质也能卖：配置客服文案 `SUPPORT_TEXT` 和客服微信 `SUPPORT_WECHAT`，用户下单后页面会显示「把订单号和付款截图发微信 xxx」，你在后台生成兑换码发给对方即可。
 
 ### 用支付宝个人收款码（无需商户号）
 
