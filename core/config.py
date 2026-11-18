@@ -65,6 +65,7 @@ class Settings:
     max_input_chars: int
     max_refines: int
     support_text: str
+    support_wechat: str
     site_url: str
     epay_url: str
     epay_pid: str
@@ -87,6 +88,7 @@ def get_settings() -> Settings:
         max_input_chars=int(_secret("MAX_INPUT_CHARS", "8000") or 8000),
         max_refines=int(_secret("MAX_REFINES", "20") or 20),
         support_text=_secret("SUPPORT_TEXT", "如需购买或续费，请联系客服微信"),
+        support_wechat=_secret("SUPPORT_WECHAT"),
         site_url=_secret("SITE_URL", "http://localhost:8501"),
         epay_url=_secret("EPAY_URL"),
         epay_pid=_secret("EPAY_PID"),

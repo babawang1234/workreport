@@ -475,7 +475,12 @@ def render_manual_pay() -> None:
         if ss.get("manual_order_no"):
             st.success("订单已提交，客服核对到账后会自动发码")
             st.code(ss["manual_order_no"], language=None)
-            st.caption(f"把订单号和付款截图发客服（{settings.support_text}），一般几分钟内处理完成")
+            if settings.support_wechat:
+                st.caption(
+                    f"把订单号和付款截图发微信 {settings.support_wechat}，一般几分钟内处理完成"
+                )
+            else:
+                st.caption("把订单号和付款截图发给客服，一般几分钟内处理完成")
 
         st.markdown("---")
         st.markdown('<div class="card-title"><span class="dot"></span>已付款？用订单号查兑换码</div>', unsafe_allow_html=True)
@@ -497,7 +502,10 @@ def render_manual_pay() -> None:
                     else:
                         st.error(result.message)
             else:
-                st.info("订单还在等待确认，付款后请联系客服催单")
+                if settings.support_wechat:
+                    st.info(f"订单还在等待确认，可加微信 {settings.support_wechat} 催单")
+                else:
+                    st.info("订单还在等待确认，付款后请联系客服催单")
 
 
 def render_buy_page() -> None:
