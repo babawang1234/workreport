@@ -51,7 +51,6 @@ for key, value in {
     "brief": "",
     "extra": "",
     "refine_text": "",
-    "admin_unlocked": False,
     "page": "use",
     "order_no": "",
     "pay_url": "",
@@ -193,22 +192,6 @@ def render_sidebar():
         )
         st.markdown("---")
         st.markdown(f'<div class="muted">{settings.support_text}</div>', unsafe_allow_html=True)
-
-        with st.expander("🔐 管理后台"):
-            if ss.admin_unlocked:
-                if st.button("退出后台", width="stretch"):
-                    ss.admin_unlocked = False
-                    st.rerun()
-            else:
-                pwd = st.text_input("管理密码", type="password", key="admin_pwd")
-                if st.button("进入后台", width="stretch"):
-                    if pwd and pwd == settings.admin_password:
-                        ss.admin_unlocked = True
-                        st.rerun()
-                    else:
-                        st.error("密码错误")
-            if settings.admin_password == "admin888":
-                st.caption("⚠️ 当前为默认密码，上线前请修改 .env 中的 ADMIN_PASSWORD")
         return quota_placeholder
 
 
@@ -591,19 +574,63 @@ def render_reports_page() -> None:
             goto("use")
         return
 
+    kw = st.text_input(
+        "搜索报告", key="report_search", placeholder="输入标题或正文关键词，例如：登录页、数据看板"
+    )
+    c1, c2 = st.columns(2)
+    start = c1.date_input("开始日期", value=None, key="report_start")
+    end = c2.date_input("结束日期", value=None, key="report_end")
+
+    filtered = []
     for record in reports:
+        day = record["updated_at"][:10]
+        if kw.strip() and kw.strip() not in record["title"] + record["content"]:
+            continue
+        if start and day < start.isoformat():
+            continue
+        if end and day > end.isoformat():
+            continue
+        filtered.append(record)
+
+    st.caption(f"共 {len(filtered)} 份（全部 {len(reports)} 份）")
+    if not filtered:
+        st.info("没有符合条件的报告，换个关键词或日期试试")
+        return
+
+    for record in filtered:
         with st.container(border=True):
-            col1, col2, col3 = st.columns([4, 1, 1])
+            col1, col2, col3, col4 = st.columns([3.4, 0.9, 1.1, 0.9])
             col1.markdown(f"**{record['title']}**")
             col1.caption(f"{record['position']} · {record['report_type']} · 更新于 {record['updated_at'][:16]}")
             if col2.button("打开", key=f"open_{record['id']}", width="stretch"):
                 open_report(record["id"])
-            if col3.button("删除", key=f"del_{record['id']}", width="stretch"):
+            if col3.button("导出 Word", key=f"export_{record['id']}", width="stretch"):
+                ss["export_report_id"] = record["id"]
+            if col4.button("删除", key=f"del_{record['id']}", width="stretch"):
                 store.delete_report(record["id"], session["code"])
                 if ss.report_id == record["id"]:
                     ss.report = ""
                     ss.report_id = None
+                if ss.get("export_report_id") == record["id"]:
+                    ss["export_report_id"] = None
                 st.rerun()
+
+    export_id = ss.get("export_report_id")
+    if export_id:
+        record = store.get_report(export_id, session["code"])
+        if record:
+            title = f"{record['position']}{record['report_type']}（{record['period']}）".strip()
+            try:
+                docx_bytes = md_to_docx(ensure_title(record["content"], title), title)
+            except Exception:
+                docx_bytes = b""
+            if docx_bytes:
+                st.download_button(
+                    "⬇️ 下载 Word",
+                    docx_bytes,
+                    file_name=f"{record['position']}{record['report_type']}_{record['updated_at'][:10]}.docx",
+                    width="stretch",
+                )
 
 
 # ---------------------------------------------------------------- 输入区
@@ -876,125 +903,8 @@ def render_output_card() -> None:
             )
 
 
-# ---------------------------------------------------------------- 管理后台
-def render_admin() -> None:
-    st.markdown("## 🔐 管理后台")
-    stats = store.admin_stats()
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("兑换码", stats["codes"])
-    c2.metric("总次数", stats["total_uses"])
-    c3.metric("已用次数", stats["used_uses"])
-    c4.metric("激活用户", stats["users"])
-    c5.metric("今日生成", stats["today"])
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title"><span class="dot"></span>生成兑换码</div>', unsafe_allow_html=True)
-        with st.form("create_codes"):
-            a, b, c, d = st.columns(4)
-            count = a.number_input("数量", min_value=1, max_value=200, value=10)
-            uses = b.number_input("每个可用次数", min_value=1, max_value=10000, value=20)
-            prefix = c.text_input("前缀", value="RP")
-            days = d.number_input("有效天数（0=永久）", min_value=0, max_value=3650, value=0)
-            note = st.text_input("备注", placeholder="例如：抖音渠道 / 双十一活动")
-            if st.form_submit_button("生成", type="primary"):
-                codes = store.create_codes(int(count), int(uses), prefix, int(days), note)
-                st.success(f"已生成 {len(codes)} 个兑换码，可直接复制发给用户：")
-                st.code("\n".join(codes), language=None)
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title"><span class="dot"></span>兑换码列表</div>', unsafe_allow_html=True)
-        keyword = st.text_input("搜索", placeholder="输入兑换码或备注关键词", label_visibility="collapsed")
-        rows = store.list_codes(keyword)
-        st.dataframe(
-            [
-                {
-                    "兑换码": r.code,
-                    "总次数": r.total,
-                    "已用": r.used,
-                    "剩余": r.remaining,
-                    "状态": "正常" if r.active else "已停用",
-                    "过期时间": r.expires_at or "永久",
-                    "备注": r.note,
-                    "创建时间": r.created_at,
-                }
-                for r in rows
-            ],
-            width="stretch",
-            hide_index=True,
-        )
-        st.caption(f"共 {len(rows)} 条")
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title"><span class="dot"></span>单码操作</div>', unsafe_allow_html=True)
-        a, b, c, d = st.columns([2, 1, 1, 1])
-        target = a.text_input("兑换码", placeholder="RP-XXXXXX", label_visibility="collapsed")
-        delta = b.number_input("增加次数", min_value=0, max_value=10000, value=10)
-        if c.button("加次数", width="stretch"):
-            if target and store.add_uses(target, int(delta)):
-                st.success("已增加次数")
-            else:
-                st.error("操作失败，请检查兑换码")
-        if d.button("停用 / 启用", width="stretch"):
-            info = store.code_detail(target) if target else None
-            if not info:
-                st.error("兑换码不存在")
-            elif store.set_code_active(target, not info.active):
-                st.success("已切换状态，刷新列表查看")
-            else:
-                st.error("操作失败")
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title"><span class="dot"></span>订单与收入</div>', unsafe_allow_html=True)
-        order_stat = store.order_stats()
-        s1, s2, s3, s4 = st.columns(4)
-        s1.metric("累计收入", f"¥{yuan(order_stat['revenue'])}")
-        s2.metric("今日收入", f"¥{yuan(order_stat['today_revenue'])}")
-        s3.metric("已付订单", order_stat["paid_count"])
-        s4.metric("待支付", order_stat["pending"])
-        keyword = st.text_input(
-            "搜索订单", placeholder="订单号 / 兑换码", label_visibility="collapsed", key="order_search"
-        )
-        orders = store.list_orders(keyword)
-        st.dataframe(
-            [
-                {
-                    "订单号": o["order_no"],
-                    "套餐": o["plan_name"],
-                    "金额": yuan(o["amount"]),
-                    "次数": o["uses"],
-                    "状态": "已支付" if o["status"] == "paid" else "待支付",
-                    "备注": o.get("remark") or "",
-                    "兑换码": o["code"] or "",
-                    "创建时间": o["created_at"],
-                    "支付时间": o["paid_at"] or "",
-                }
-                for o in orders
-            ],
-            width="stretch",
-            hide_index=True,
-        )
-        a, b = st.columns([3, 1])
-        manual_no = a.text_input(
-            "订单号", key="manual_order", placeholder="手动补单：粘贴订单号后可强制确认到账并发码", label_visibility="collapsed"
-        )
-        if b.button("确认到账并发码", width="stretch"):
-            ok, code, message = store.mark_order_paid(manual_no.strip(), "manual")
-            if ok:
-                st.success(f"{message}：{code}")
-            else:
-                st.error(message)
-
-    with st.container(border=True):
-        st.markdown('<div class="card-title"><span class="dot"></span>最近记录</div>', unsafe_allow_html=True)
-        st.dataframe(store.recent_logs(30), width="stretch", hide_index=True)
-
-
 # ---------------------------------------------------------------- 页面组装
 render_hero()
-
-if ss.admin_unlocked:
-    render_admin()
-    st.stop()
 
 if ss.page == "buy":
     render_buy_page()

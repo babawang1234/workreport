@@ -47,6 +47,7 @@ git push -u origin main
    LLM_API_KEY = "sk-你的模型密钥"
    LLM_BASE_URL = "https://api.deepseek.com"
    LLM_MODEL = "deepseek-chat"
+   ADMIN_USER = "admin"
    ADMIN_PASSWORD = "换成你的强密码"
    DATABASE_URL = "postgresql://...pooler...neondb?sslmode=require"
    SITE_URL = "https://你的应用名.streamlit.app"
@@ -63,7 +64,7 @@ git push -u origin main
 
 ### 4. 上线自检
 
-- 进侧边栏「🔐 管理后台」→ 生成一个测试码 → 激活 → 生成一份报告。
+- 运行 `streamlit run admin.py` → 生成一个测试码 → 激活 → 生成一份报告。
 - 手机打开同一链接，输入同一个码，确认剩余次数和历史报告都在。
 - 以后改代码：`git push` 即自动重新部署。
 
@@ -85,7 +86,7 @@ git push -u origin main
 ```bash
 # 服务器上
 git clone <你的仓库> workreport && cd workreport
-cp .env.example .env && vim .env      # 填模型密钥、SITE_URL=https://你的域名、DOMAIN=你的域名、ADMIN_PASSWORD
+cp .env.example .env && vim .env      # 填模型密钥、SITE_URL=https://你的域名、DOMAIN=你的域名、ADMIN_USER、ADMIN_PASSWORD
 docker compose up -d --build
 ```
 
@@ -107,14 +108,14 @@ docker compose up -d --build
    ```
 3. 重启服务。用户在「购买次数」页选套餐 → 跳收银台付款 → 页面每 8 秒自动查单，支付成功即自动发码并激活（**不依赖异步回调**，所以不需要公网 webhook）。
 
-没有支付资质也能卖：配置客服文案 `SUPPORT_TEXT` 和客服微信 `SUPPORT_WECHAT`，用户下单后页面会显示「把订单号和付款截图发微信 xxx」，你在后台生成兑换码发给对方即可。
+没有支付资质也能卖：配置客服文案 `SUPPORT_TEXT` 和客服微信 `SUPPORT_WECHAT`，用户下单后页面会显示「把订单号和付款截图发微信 xxx」，你在独立后台生成兑换码发给对方即可。
 
 ### 用支付宝个人收款码（无需商户号）
 
 1. 支付宝 App → 收钱 → 保存收款码图片，放到 `assets/alipay_qr.png`（仓库里已有同名文件就直接替换它）。
 2. 重启应用即生效，不用改配置。若想用图床链接，则在 Secrets 里加一行 `ALIPAY_QR = "https://你的图片地址.png"`（配置优先级高于本地图片）。
 3. 用户在「购买次数」页会看到二维码：扫码付款 → 填备注/联系方式 → 提交订单，拿到订单号。
-4. 你在后台「订单与收入」看到待支付订单和备注，核对到账后点「确认到账并发码」；用户凭订单号在购买页自助查询兑换码并激活。
+4. 你在独立后台（`admin.py`）的「订单管理」看到待支付订单和备注，核对到账后点「确认到账并发码」；用户凭订单号在购买页自助查询兑换码并激活。
 5. 想让客服微信只在用户提交订单后才出现（避免公开手机号）：
    ```toml
    SUPPORT_TEXT = "付款遇到问题请联系客服"
@@ -123,17 +124,24 @@ docker compose up -d --build
    用户提交订单拿到订单号后，页面才显示「把订单号和付款截图发微信 xxx」。
 
 
-## 五、日常运营（管理后台）
+## 五、日常运营（独立后台）
 
-侧边栏「🔐 管理后台」→ 输入 `ADMIN_PASSWORD`：
+管理员后台是独立应用 [admin.py](admin.py)，只在管理员登录后可见，普通用户页面没有任何入口。
+
+本地启动：
+
+```bash
+streamlit run admin.py
+```
+
+输入 `ADMIN_USER` / `ADMIN_PASSWORD` 登录。想在手机上随时看营收，可在 Streamlit Cloud 再建一个 App（Main file 选 `admin.py`），Secrets 填同样的 `DATABASE_URL`、`ADMIN_USER`、`ADMIN_PASSWORD`；这个链接只自己保存，不要放到用户页面上。
 
 | 功能 | 用途 |
 | --- | --- |
-| 订单与收入 | 累计/今日收入、已付/待支付订单、流水 |
-| 确认到账并发码 | 用户付款但自动查单失败的兜底（输入订单号即可补发） |
-| 生成兑换码 | 做渠道分销、朋友送码、线下收款 |
-| 单码操作 | 加次数、停用违规码 |
-| 最近记录 | 激活/生成/退款等行为日志 |
+| 经营看板 | 今日/累计收入与成交、待发码提醒、今日生成量、剩余可用次数 |
+| 订单管理 | 订单搜索、状态筛选、CSV 导出、手动补单发码 |
+| 兑换码 | 批量生成、加次数、停用违规码、导出记录 |
+| 运营记录 | 下单、发码、激活、生成等关键动作日志，可导出 |
 
 ## 六、多端同步是怎么实现的
 
@@ -162,6 +170,7 @@ docker compose up -d --build
 | `DATABASE_URL` | 云 Postgres 连接串；留空则用本地 SQLite | 空 |
 | `SITE_URL` | 站点公网地址（支付回跳） | `http://localhost:8501` |
 | `EPAY_URL / EPAY_PID / EPAY_KEY` | 在线支付，留空则关闭 | — |
+| `ADMIN_USER` | 管理员账号（独立后台登录用） | `admin` |
 | `ADMIN_PASSWORD` | 后台密码，**上线必改** | `admin888` |
 | `MAX_REFINES` | 单份报告微调上限 | `20` |
 | `SUPPORT_TEXT` | 客服/购买引导文案（公开显示，建议不含手机号） | — |
@@ -170,7 +179,9 @@ docker compose up -d --build
 ## 九、目录结构
 
 ```
-app.py                 # 页面与交互（售卖 / 激活 / 生成 / 报告 / 后台）
+app.py                 # 用户端：售卖 / 激活 / 生成 / 报告历史
+admin.py               # 管理员独立后台：营收 / 订单 / 兑换码 / 日志
+tools/ops_report.py    # 命令行经营巡检（可选，配合定时任务）
 core/prompts.py        # 13 个岗位模板 + 汇报结构（调优就改这里）
 core/payments.py       # 套餐 + 易支付对接（查单发码）
 core/store.py          # 兑换码 / 订单 / 云端报告
@@ -182,9 +193,10 @@ docker-compose.yml     # 自有服务器一键部署（含 Caddy 自动 HTTPS）
 
 ## 十、上线检查清单
 
-- [ ] `ADMIN_PASSWORD` 已改为强密码
+- [ ] `ADMIN_USER` / `ADMIN_PASSWORD` 已设置为自己的账号密码
 - [ ] `SITE_URL` 是实际公网地址（否则支付回跳会失真）
 - [ ] 云端部署时 `DATABASE_URL` 已填（免费云磁盘是临时的，不填会丢码）
 - [ ] `.env` 与 `data/app.db` 未提交到公开仓库（`.gitignore` 已处理）
-- [ ] 支付完成后在后台「订单与收入」确认能看到订单与收入
+- [ ] 支付完成后在 `admin.py` 的「订单管理」确认能看到订单与收入
+- [ ] 用户端侧边栏没有管理入口（后台为独立应用）
 - [ ] 用手机打开链接，走一遍「购买 → 输入兑换码 → 生成」全流程

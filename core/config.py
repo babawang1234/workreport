@@ -59,6 +59,7 @@ class Settings:
     model: str
     temperature: float
     max_tokens: int
+    admin_user: str
     admin_password: str
     db_path: Path
     database_url: str
@@ -82,6 +83,7 @@ def get_settings() -> Settings:
         model=_secret("LLM_MODEL", "deepseek-chat"),
         temperature=float(_secret("LLM_TEMPERATURE", "0.5") or 0.5),
         max_tokens=int(_secret("LLM_MAX_TOKENS", "2400") or 2400),
+        admin_user=_secret("ADMIN_USER", "admin"),
         admin_password=_secret("ADMIN_PASSWORD", "admin888"),
         db_path=DATA_DIR / "app.db",
         database_url=_secret("DATABASE_URL"),
