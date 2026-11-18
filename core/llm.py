@@ -43,24 +43,37 @@ def _friendly(exc: Exception) -> str:
 
 def stream_chat(messages: list[dict[str, str]], *, temperature: float | None = None) -> Iterator[str]:
     settings = get_settings()
-    try:
-        client = _client()
-        stream = client.chat.completions.create(
-            model=settings.model,
-            messages=messages,
-            temperature=settings.temperature if temperature is None else temperature,
-            max_tokens=settings.max_tokens,
-            stream=True,
-        )
-        for chunk in stream:
-            choices = getattr(chunk, "choices", None)
-            if not choices:
-                continue
-            delta = getattr(choices[0], "delta", None)
-            piece = getattr(delta, "content", None) if delta else None
-            if piece:
-                yield piece
-    except LLMError:
-        raise
-    except Exception as exc:  # noqa: BLE001 - 统一转成可读提示
-        raise LLMError(_friendly(exc)) from exc
+    client = _client()
+    budget = settings.max_tokens
+    # 推理模型（如 glm-5.3-flash）可能把预算全用在 reasoning 上，正文为空且 finish_reason=length。
+    # 这种情况下自动加倍预算重试一次。
+    for attempt in range(2):
+        produced = False
+        finish = None
+        try:
+            stream = client.chat.completions.create(
+                model=settings.model,
+                messages=messages,
+                temperature=settings.temperature if temperature is None else temperature,
+                max_tokens=budget,
+                stream=True,
+            )
+            for chunk in stream:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+                choice = choices[0]
+                if getattr(choice, "finish_reason", None):
+                    finish = choice.finish_reason
+                delta = getattr(choice, "delta", None)
+                piece = getattr(delta, "content", None) if delta else None
+                if piece:
+                    produced = True
+                    yield piece
+        except LLMError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - 统一转成可读提示
+            raise LLMError(_friendly(exc)) from exc
+        if produced or finish != "length" or attempt == 1 or budget >= 16384:
+            return
+        budget = min(budget * 2, 16384)
