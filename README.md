@@ -26,6 +26,14 @@ python -m uvicorn webapp.main:app --port 8600   # 或双击 run_web.bat
 
 部署到自己的服务器时，用 `uvicorn webapp.main:app --host 0.0.0.0 --port 8600`，前面套 Nginx/Caddy 反代即可。
 
+一键部署到 Ubuntu 云服务器（Nginx + systemd + venv，自动读取本机 `.env` 写入服务端环境变量）：
+
+```bash
+python deploy/server/deploy.py --host 你的公网IP --password 服务器密码
+```
+
+脚本默认用 `ubuntu` 账号 + sudo（腾讯云轻量默认禁用 root 远程登录），装完访问 `http://你的IP/` 即可；重启服务器后服务自动恢复。
+
 ## 二、免费上线（零服务器：Streamlit Cloud + Neon）
 
 不想买服务器、也不用在自己电脑上常开，走这条：**代码放 GitHub，网页托管交给 Streamlit 官方云（免费），数据放 Neon 免费 Postgres**。
