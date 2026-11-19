@@ -56,7 +56,9 @@ if not ss.authed:
         pwd = st.text_input("密码", type="password")
         submitted = st.form_submit_button("登录", type="primary", width="stretch")
     if submitted:
-        if user.strip() == settings.admin_user and pwd == settings.admin_password:
+        if settings.admin_password == "admin888":
+            st.error("后台尚未配置管理员密码：请在 Secrets 中设置 ADMIN_USER / ADMIN_PASSWORD")
+        elif user.strip() == settings.admin_user and pwd == settings.admin_password:
             ss.authed = True
             st.rerun()
         else:
