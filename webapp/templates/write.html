@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}写汇报 · 汇报官{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>写汇报</h1>
+    <p class="muted">把聊天记录、待办、口语描述整段粘进去，越真实越好。</p>
+  </div>
+  <div class="page-head-side">
+    <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
+    <span class="muted small">兑换码 {{ info.code }}</span>
+  </div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2 class="card-title">① 粘贴你的工作碎片</h2>
+    <form id="gen-form" class="stack" autocomplete="off">
+      <label class="field">
+        <textarea name="brief" rows="9" placeholder="随便写，越真实越好。例如：&#10;周一开产品评审会，方案改了 3 版；周二对接运营确认活动排期；&#10;周三处理 5 个客诉；周四输出 Q4 规划初稿；周五和技术对齐开发排期……"></textarea>
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>岗位</span>
+          <select name="position">
+            {% for p in positions %}<option value="{{ p }}" {{ 'selected' if p == '产品经理' else '' }}>{{ p }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>汇报类型</span>
+          <select name="report_type">
+            {% for t in report_types %}<option value="{{ t }}" {{ 'selected' if t == '周报' else '' }}>{{ t }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>汇报对象</span>
+          <select name="audience">
+            {% for a in audiences %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>汇报周期</span>
+          <input type="text" id="period" name="period" value="{{ period_defaults['周报'] }}">
+        </label>
+      </div>
+
+      <label class="field">
+        <span>篇幅</span>
+        <select name="length_key">
+          {% for l in lengths %}<option value="{{ l }}" {{ 'selected' if l == default_length else '' }}>{{ l }}</option>{% endfor %}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>补充要求（选填）</span>
+        <input type="text" name="extra" placeholder="例如：这次重点体现降本增效 / 少提问题、多写成果">
+      </label>
+
+      <button type="submit" class="btn primary block" id="gen-btn" {{ 'disabled' if info.remaining <= 0 else '' }}>
+        {{ '次数已用完，请先购买' if info.remaining <= 0 else '✨ 一键生成汇报' }}
+      </button>
+      <div id="gen-status" class="status"></div>
+    </form>
+    <script type="application/json" id="period-defaults">{{ period_defaults | tojson }}</script>
+  </section>
+
+  <section class="card">
+    <h2 class="card-title">② 汇报正文</h2>
+    <div id="empty-state" class="empty">
+      <span class="big">🗂️</span>
+      粘贴工作碎片，选好岗位与汇报类型<br>点「一键生成汇报」，30 秒拿到可直接提交的成稿
+    </div>
+    <div id="stream-box" class="stream-box hidden">
+      <pre id="stream-text" class="stream-text"></pre>
+    </div>
+    <p class="muted small">生成完成后会自动跳转到报告详情页，可以继续微调、导出 Word。</p>
+  </section>
+</div>
+{% endblock %}

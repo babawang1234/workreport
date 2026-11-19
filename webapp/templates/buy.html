@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}购买次数 · 汇报官{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>购买次数</h1>
+    <p class="muted">兑换码就是你的账号：手机、电脑输入同一个码，剩余次数和历史报告实时同步。</p>
+  </div>
+  <div class="page-head-side">
+    <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
+    <span class="muted small">当前账号 {{ info.code }}</span>
+  </div>
+</section>
+
+<form id="order-form" autocomplete="off">
+  <div class="plan-grid">
+    {% for p in plans %}
+    <label class="plan-card {{ 'featured' if p.badge else '' }}">
+      <input type="radio" name="plan_id" value="{{ p.id }}" {{ 'checked' if loop.first else '' }}>
+      <span class="plan-badge {{ 'hidden' if not p.badge else '' }}">{{ p.badge or '占位' }}</span>
+      <span class="plan-name">{{ p.name }}</span>
+      <span class="plan-price"><em>¥</em>{{ p.price_label }}</span>
+      <span class="plan-uses">{{ p.uses }} 次生成</span>
+      <span class="plan-desc">{{ p.desc }}</span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div class="pay-grid">
+    <section class="card qr-card">
+      <h2 class="card-title">支付宝扫码付款</h2>
+      {% if qr_url %}
+      <img class="qr-img" src="{{ qr_url }}" alt="支付宝收款码">
+      <p class="muted small">付款时在备注里写上你的微信名或手机尾号，方便对账</p>
+      {% else %}
+      <div class="alert warn">收款码未就绪：请把图片放到 assets/alipay_qr.png，或配置 ALIPAY_QR。</div>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">提交订单</h2>
+      <div class="stack">
+        <label class="field">
+          <span>付款备注 / 联系方式</span>
+          <input type="text" id="order-remark" maxlength="200" placeholder="例如：微信 wxid_abc 或 手机尾号 8899">
+        </label>
+        <button type="button" class="btn primary block" id="order-btn">我已付款，提交订单</button>
+        <div id="order-status" class="status"></div>
+        <p class="muted small">{{ support_text }}</p>
+      </div>
+    </section>
+  </div>
+</form>
+
+<section id="order-result" class="card result hidden" data-wechat="{{ support_wechat }}">
+  <h2 class="card-title">订单已提交</h2>
+  <p class="muted">订单号（客服核对到账后自动发码）：</p>
+  <div class="order-no" id="order-no"></div>
+  <p class="muted small" id="order-tip"></p>
+  <p class="muted small">用下面的「查询订单」粘贴订单号即可查看状态和兑换码。</p>
+</section>
+
+<section class="card">
+  <h2 class="card-title">已付款？用订单号查兑换码</h2>
+  <form id="query-form" class="inline-form" autocomplete="off">
+    <input type="text" id="query-no" placeholder="粘贴订单号，例如 202611191530001234">
+    <button type="submit" class="btn">查询订单</button>
+  </form>
+  <div id="query-status" class="status"></div>
+
+  <div id="query-result" class="result hidden">
+    <div class="result-row"><span>订单号</span><b id="q-no"></b></div>
+    <div class="result-row"><span>套餐</span><b id="q-plan"></b></div>
+    <div class="result-row"><span>金额</span><b id="q-amount"></b></div>
+    <div class="result-row"><span>状态</span><b id="q-status"></b></div>
+    <div id="q-code-wrap" class="hidden">
+      <div class="result-row"><span>兑换码</span><b id="q-code" class="code"></b></div>
+      <a id="q-activate" class="btn primary block" href="#">用此码激活</a>
+    </div>
+    <p id="q-tip" class="muted small"></p>
+  </div>
+</section>
+{% endblock %}

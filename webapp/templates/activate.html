@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}激活兑换码 · 汇报官{% endblock %}
+{% block content %}
+<section class="hero hero-activate">
+  <div class="hero-main">
+    <p class="hero-kicker">工作汇报智能 Agent</p>
+    <h1>粘贴工作碎片，5 分钟搞定周报</h1>
+    <p class="hero-sub">13 个岗位风格 · 支持多轮微调 · 导出即可提交</p>
+  </div>
+  <div class="hero-tags">
+    <span>日报</span><span>周报</span><span>月报</span><span>季度总结</span>
+  </div>
+</section>
+
+<section class="card narrow">
+  <h2 class="card-title">🎟️ 输入兑换码开始使用</h2>
+  <p class="muted">兑换码就是你的账号：手机和电脑输入同一个码，剩余次数和历史报告会自动同步。</p>
+
+  <form method="post" action="/activate" class="stack">
+    <label class="field">
+      <span>兑换码</span>
+      <input type="text" name="code" value="{{ code_value }}" placeholder="例如 RP-8F3K2Q" autocomplete="off" autocapitalize="characters" required autofocus>
+    </label>
+    {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+    <button type="submit" class="btn primary block">立即激活</button>
+  </form>
+
+  <p class="muted small">{{ settings.support_text }}{% if settings.support_wechat %}：{{ settings.support_wechat }}{% endif %}</p>
+</section>
+{% endblock %}

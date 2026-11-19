@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ record.title or '报告详情' }} · 汇报官{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <a class="back-link" href="/reports">← 返回列表</a>
+    <h1 class="detail-title">{{ record.title or '未命名汇报' }}</h1>
+    <div class="report-meta">
+      <span>{{ record.position }}</span><span>{{ record.report_type }}</span>
+      <span>{{ record.period }}</span><span>更新于 {{ record.updated_at[:16] }}</span>
+    </div>
+  </div>
+  <div class="page-head-side">
+    <a class="btn primary sm" href="/reports/{{ record.id }}/docx">⬇️ 导出 Word</a>
+    <form method="post" action="/reports/{{ record.id }}/delete" onsubmit="return confirm('确定删除这份报告吗？');">
+      <button type="submit" class="btn sm danger">删除</button>
+    </form>
+  </div>
+</section>
+
+<div class="grid detail-grid">
+  <section class="card">
+    <article id="report-body" class="prose">{{ content_html | safe }}</article>
+    <div id="stream-box" class="stream-box hidden">
+      <pre id="stream-text" class="stream-text"></pre>
+    </div>
+  </section>
+
+  <aside class="stack-aside">
+    <section class="card">
+      <h2 class="card-title">③ 不满意？直接说，我改</h2>
+      {% if can_refine %}
+      <form id="refine-form" class="stack" data-report-id="{{ record.id }}" autocomplete="off">
+        <input type="hidden" name="position" value="{{ record.position }}">
+        <input type="hidden" name="report_type" value="{{ record.report_type }}">
+        <label class="field">
+          <textarea name="instruction" rows="3" placeholder="例如：把第二点拆得更详细 / 改成国企正式文风 / 压缩成 300 字"></textarea>
+        </label>
+        <div class="quick-actions">
+          {% for action in quick_actions %}
+          <button type="button" class="chip" data-fill="{{ action }}">{{ action }}</button>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn primary block" id="refine-btn">应用修改</button>
+        <div id="refine-status" class="status"></div>
+        <p class="muted small">微调不额外扣次数。</p>
+      </form>
+      {% else %}
+      <p class="muted">本份报告微调次数已达上限，建议先生成一份新报告。</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">历史版本（{{ versions | length }}）</h2>
+      <ol class="versions">
+        {% for v in versions | reverse %}
+        <li>
+          <details {{ 'open' if loop.first else '' }}>
+            <summary><span>{{ v.label }}</span><span class="muted small">{{ v.text | length }} 字</span></summary>
+            <pre class="version-text">{{ v.text }}</pre>
+          </details>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+  </aside>
+</div>
+{% endblock %}

@@ -13,6 +13,19 @@ streamlit run app.py
 
 打开 `http://localhost:8501`。此时支付通道未配置，页面会自动降级为「联系客服购买」，不影响生成、微调、导出等功能。
 
+### 更快的 Web 版（FastAPI，推荐日常使用）
+
+Streamlit 每次点击都会整页重跑，公网免费版还会休眠冷启动。`webapp/` 是同一套核心逻辑的常规网站版本，页面局部刷新、首屏快：
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn webapp.main:app --port 8600   # 或双击 run_web.bat
+```
+
+打开 `http://localhost:8600`，用兑换码激活即可。功能包含：写汇报（流式输出）、多轮微调、我的报告（搜索/日期筛选/查看/删除/导出 Word）、购买次数（收款码 + 提交订单 + 订单号查码）。`core/` 下的提示词、模型、数据层与 Streamlit 版共用，数据完全一致。
+
+部署到自己的服务器时，用 `uvicorn webapp.main:app --host 0.0.0.0 --port 8600`，前面套 Nginx/Caddy 反代即可。
+
 ## 二、免费上线（零服务器：Streamlit Cloud + Neon）
 
 不想买服务器、也不用在自己电脑上常开，走这条：**代码放 GitHub，网页托管交给 Streamlit 官方云（免费），数据放 Neon 免费 Postgres**。

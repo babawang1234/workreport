@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}我的报告 · 汇报官{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>我的报告</h1>
+    <p class="muted">账号 {{ info.code }} · 在手机或电脑输入同一个兑换码，可看到全部历史报告</p>
+  </div>
+  <div class="page-head-side">
+    <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
+    <a class="btn primary sm" href="/write">写新汇报</a>
+  </div>
+</section>
+
+<form method="get" action="/reports" class="filter-bar">
+  <input type="search" name="q" value="{{ q }}" placeholder="搜索标题或正文关键词，例如：登录页、数据看板">
+  <label class="date-field"><span>开始</span><input type="date" name="start" value="{{ start }}"></label>
+  <label class="date-field"><span>结束</span><input type="date" name="end" value="{{ end }}"></label>
+  <button type="submit" class="btn">筛选</button>
+  {% if q or start or end %}<a class="btn ghost" href="/reports">清空</a>{% endif %}
+</form>
+
+{% if total == 0 %}
+<div class="card empty">
+  <span class="big">📁</span>
+  还没有保存的报告<br>去「写汇报」生成第一份吧
+  <div class="empty-action"><a class="btn primary" href="/write">去写汇报</a></div>
+</div>
+{% elif reports | length == 0 %}
+<div class="card empty">没有符合条件的报告，换个关键词或日期试试</div>
+{% else %}
+<p class="muted small">共 {{ reports | length }} 份（全部 {{ total }} 份）</p>
+<div class="report-list">
+  {% for r in reports %}
+  <article class="report-row">
+    <div class="report-main">
+      <a class="report-title" href="/reports/{{ r.id }}">{{ r.title or '未命名汇报' }}</a>
+      <div class="report-meta">
+        <span>{{ r.position }}</span><span>{{ r.report_type }}</span>
+        <span>{{ r.period }}</span><span>更新于 {{ r.updated_at[:16] }}</span>
+      </div>
+    </div>
+    <div class="report-actions">
+      <a class="btn sm" href="/reports/{{ r.id }}">打开</a>
+      <a class="btn sm" href="/reports/{{ r.id }}/docx">导出 Word</a>
+      <form method="post" action="/reports/{{ r.id }}/delete" onsubmit="return confirm('确定删除这份报告吗？');">
+        <button type="submit" class="btn sm danger">删除</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
