@@ -49,6 +49,8 @@ def csv_bytes(rows: list[dict], fields: list[str]) -> bytes:
 if not ss.authed:
     hero()
     st.caption("独立后台：普通用户页面不显示任何营收入口，只有管理员账号登录后可见")
+    if settings.admin_password == "admin888":
+        st.warning("当前使用默认密码，请在 Secrets 中设置 ADMIN_USER / ADMIN_PASSWORD 后重启应用")
     with st.form("admin_login"):
         user = st.text_input("管理员账号", placeholder="admin")
         pwd = st.text_input("密码", type="password")
