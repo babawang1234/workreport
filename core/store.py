@@ -58,6 +58,12 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS trials (
+    visitor     TEXT PRIMARY KEY,
+    used        INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    last_at     TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_sessions_code ON sessions(code);
 CREATE INDEX IF NOT EXISTS idx_reports_code ON reports(code);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
@@ -251,6 +257,39 @@ def consume(token: str) -> tuple[bool, int]:
     _log(info["code"], "generate")
     left = info["remaining"] - 1
     return True, left
+
+
+def trial_left(visitor: str, limit: int) -> int:
+    """免费试用剩余次数（按浏览器访客标识计）。"""
+    if not visitor or limit <= 0:
+        return 0
+    with _conn() as conn:
+        row = conn.execute("SELECT used FROM trials WHERE visitor = ?", (visitor,)).fetchone()
+    used = int(row["used"]) if row else 0
+    return max(0, limit - used)
+
+
+def consume_trial(visitor: str, limit: int) -> tuple[bool, int]:
+    """消耗 1 次免费试用。返回 (是否成功, 剩余试用次数)。"""
+    if not visitor or limit <= 0:
+        return False, 0
+    with _conn() as conn:
+        row = conn.execute("SELECT used FROM trials WHERE visitor = ?", (visitor,)).fetchone()
+        used = int(row["used"]) if row else 0
+        if used >= limit:
+            return False, 0
+        if row:
+            conn.execute(
+                "UPDATE trials SET used = used + 1, last_at = ? WHERE visitor = ?",
+                (_now(), visitor),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO trials (visitor, used, created_at, last_at) VALUES (?,?,?,?)",
+                (visitor, 1, _now(), _now()),
+            )
+    _log(None, "trial", f"访客 {visitor[:8]} 试用 1 次")
+    return True, max(0, limit - used - 1)
 
 
 def log_event(token: str | None, action: str, detail: str = "") -> None:

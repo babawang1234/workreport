@@ -197,6 +197,7 @@ streamlit run admin.py
 | `MAX_REFINES` | 单份报告微调上限 | `20` |
 | `SUPPORT_TEXT` | 客服/购买引导文案（公开显示，建议不含手机号） | — |
 | `SUPPORT_WECHAT` | 客服微信号，仅在用户提交订单后显示 | 空 |
+| `TRIAL_USES` | 未激活用户的免费试用次数（按浏览器标识计，试用报告不保存） | `2` |
 
 ## 九、目录结构
 

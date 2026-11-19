@@ -59,6 +59,7 @@
     var emptyState = $("#empty-state");
     var periodInput = $("#period");
     var typeSelect = genForm.querySelector('[name="report_type"]');
+    var trialExhausted = false;
 
     var defaults = {};
     var defaultsEl = $("#period-defaults");
@@ -112,18 +113,53 @@
             genStatus.className = "status err";
             genStatus.textContent = data.message;
           } else if (data.type === "done") {
-            genStatus.className = "status ok";
-            genStatus.textContent = "生成完成，剩余 " + data.remaining + " 次，正在打开…";
-            window.location.href = "/reports/" + data.report_id;
+            if (data.trial) {
+              genStatus.className = "status ok";
+              genStatus.textContent = data.remaining > 0
+                ? "试用生成完成，还可试用 " + data.remaining + " 次（试用报告不保存）"
+                : "试用次数已用完，激活兑换码后可继续使用";
+              show(document.getElementById("result-actions"));
+              var tipEl = document.getElementById("stream-tip");
+              if (tipEl) tipEl.textContent = "试用报告不会保存。激活兑换码后可保存历史、继续微调和导出 Word。";
+              if (data.remaining <= 0) {
+                trialExhausted = true;
+                genBtn.textContent = "试用已用完，请先激活兑换码";
+                genBtn.disabled = true;
+              }
+            } else {
+              genStatus.className = "status ok";
+              genStatus.textContent = "生成完成，剩余 " + data.remaining + " 次，正在打开…";
+              window.location.href = "/reports/" + data.report_id;
+            }
           }
         });
       } catch (err) {
         genStatus.className = "status err";
         genStatus.textContent = err.message;
       } finally {
-        genBtn.disabled = false;
+        genBtn.disabled = trialExhausted;
       }
     });
+
+    var copyBtn = $("#copy-btn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async function () {
+        var content = (streamText.textContent || "").trim();
+        if (!content) return;
+        try {
+          await navigator.clipboard.writeText(content);
+          copyBtn.textContent = "已复制";
+        } catch (e) {
+          var range = document.createRange();
+          range.selectNodeContents(streamText);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          copyBtn.textContent = "已选中，按 Ctrl+C";
+        }
+        setTimeout(function () { copyBtn.textContent = "复制全文"; }, 2000);
+      });
+    }
   }
 
   /* ---------------- 报告详情：微调 ---------------- */

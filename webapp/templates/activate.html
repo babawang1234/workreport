@@ -1,19 +1,47 @@
 {% extends "base.html" %}
-{% block title %}激活兑换码 · 汇报官{% endblock %}
+{% block title %}汇报官 · 把零散工作变成可直接提交的汇报{% endblock %}
 {% block content %}
 <section class="hero hero-activate">
   <div class="hero-main">
-    <p class="hero-kicker">工作汇报智能 Agent</p>
-    <h1>粘贴工作碎片，5 分钟搞定周报</h1>
-    <p class="hero-sub">13 个岗位风格 · 支持多轮微调 · 导出即可提交</p>
+    <span class="hero-badge">工作汇报智能 Agent</span>
+    <h1>粘贴工作碎片<br>5 分钟搞定周报</h1>
+    <p class="hero-sub">聊天记录、待办清单、随口说的话，整段粘进来。<br>自动梳理成结构清晰、可直接提交的日报 / 周报 / 月报。</p>
+    <div class="hero-actions">
+      {% if trial_left > 0 %}
+      <a class="btn primary lg" href="/write">免费试用 {{ trial_left }} 次，无需注册</a>
+      {% else %}
+      <a class="btn primary lg" href="/buy">试用已用完，购买次数</a>
+      {% endif %}
+      <a class="btn ghost lg" href="#activate">我有兑换码</a>
+    </div>
+    <div class="hero-stats">
+      <div><b>13</b><span>岗位话术风格</span></div>
+      <div><b>4</b><span>汇报类型</span></div>
+      <div><b>30 秒</b><span>出一份成稿</span></div>
+    </div>
   </div>
-  <div class="hero-tags">
-    <span>日报</span><span>周报</span><span>月报</span><span>季度总结</span>
+  <div class="hero-preview">
+    <div class="preview-head"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><em>产品经理 · 周报</em></div>
+    <div class="preview-body">
+      <h4>一、本周核心工作成果</h4>
+      <p><i class="tag">版本上线</i>跟进 V2.3 上线全流程，与测试对齐回归范围，修复 3 个阻塞问题</p>
+      <p><i class="tag">需求评审</i>完成数据看板需求梳理，输出评审材料</p>
+      <h4>二、遇到的问题与解决方案</h4>
+      <p><i class="tag">排期冲突</i>与研发重排优先级，确保核心链路按期交付</p>
+      <div class="preview-skeleton"></div>
+      <div class="preview-skeleton short"></div>
+    </div>
   </div>
 </section>
 
-<section class="card narrow">
-  <h2 class="card-title">🎟️ 输入兑换码开始使用</h2>
+<section class="steps">
+  <div class="step"><span class="step-num">1</span><div><b>粘贴工作碎片</b><small>聊天记录、待办，越真实越好</small></div></div>
+  <div class="step"><span class="step-num">2</span><div><b>选择岗位与类型</b><small>13 个岗位自动匹配重点</small></div></div>
+  <div class="step"><span class="step-num">3</span><div><b>导出提交</b><small>微调满意后导出 Word</small></div></div>
+</section>
+
+<section class="card narrow" id="activate">
+  <h2 class="card-title">输入兑换码开始使用</h2>
   <p class="muted">兑换码就是你的账号：手机和电脑输入同一个码，剩余次数和历史报告会自动同步。</p>
 
   <form method="post" action="/activate" class="stack">
@@ -22,9 +50,15 @@
       <input type="text" name="code" value="{{ code_value }}" placeholder="例如 RP-8F3K2Q" autocomplete="off" autocapitalize="characters" required autofocus>
     </label>
     {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
-    <button type="submit" class="btn primary block">立即激活</button>
+    <button type="submit" class="btn primary block lg">立即激活</button>
   </form>
 
   <p class="muted small">{{ settings.support_text }}{% if settings.support_wechat %}：{{ settings.support_wechat }}{% endif %}</p>
+</section>
+
+<section class="faq">
+  <details><summary>免费试用有什么限制？</summary><p>每个浏览器可免费生成 {{ settings.trial_uses }} 次，试用报告不保存；激活兑换码后自动保存，可随时微调、导出 Word。</p></details>
+  <details><summary>手机上能用吗？</summary><p>可以，页面自适应手机屏幕，输入同一个兑换码就能看到全部次数和历史报告。</p></details>
+  <details><summary>次数怎么算？</summary><p>每生成一份报告扣 1 次；同一份报告的微调不扣次数。</p></details>
 </section>
 {% endblock %}

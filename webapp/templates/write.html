@@ -1,14 +1,29 @@
 {% extends "base.html" %}
 {% block title %}写汇报 · 汇报官{% endblock %}
 {% block content %}
+{% if trial_mode %}
+<section class="trial-banner">
+  <span class="trial-badge">免费试用</span>
+  <div>
+    <b>还可试用 {{ trial_left }} 次</b>
+    <small>试用生成的报告不会保存，也无法微调；激活兑换码后自动保存全部报告。</small>
+  </div>
+  <a class="btn ghost sm" href="/activate">去激活</a>
+</section>
+{% endif %}
+
 <section class="page-head">
   <div>
     <h1>写汇报</h1>
     <p class="muted">把聊天记录、待办、口语描述整段粘进去，越真实越好。</p>
   </div>
   <div class="page-head-side">
+    {% if info %}
     <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
     <span class="muted small">兑换码 {{ info.code }}</span>
+    {% else %}
+    <span class="quota-pill trial">试用剩 {{ trial_left }} 次</span>
+    {% endif %}
   </div>
 </section>
 
@@ -60,9 +75,7 @@
         <input type="text" name="extra" placeholder="例如：这次重点体现降本增效 / 少提问题、多写成果">
       </label>
 
-      <button type="submit" class="btn primary block" id="gen-btn" {{ 'disabled' if info.remaining <= 0 else '' }}>
-        {{ '次数已用完，请先购买' if info.remaining <= 0 else '✨ 一键生成汇报' }}
-      </button>
+      <button type="submit" class="btn primary block lg" id="gen-btn">✨ 一键生成汇报</button>
       <div id="gen-status" class="status"></div>
     </form>
     <script type="application/json" id="period-defaults">{{ period_defaults | tojson }}</script>
@@ -77,7 +90,11 @@
     <div id="stream-box" class="stream-box hidden">
       <pre id="stream-text" class="stream-text"></pre>
     </div>
-    <p class="muted small">生成完成后会自动跳转到报告详情页，可以继续微调、导出 Word。</p>
+    <div id="result-actions" class="result-actions hidden">
+      <button type="button" class="btn ghost" id="copy-btn">复制全文</button>
+      <a class="btn primary" href="/buy">购买次数，保存并微调</a>
+    </div>
+    <p class="muted small" id="stream-tip">生成完成后会自动跳转到报告详情页，可以继续微调、导出 Word。</p>
   </section>
 </div>
 {% endblock %}

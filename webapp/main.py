@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import json
+import secrets
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
@@ -40,6 +41,7 @@ from core.prompts import (
 
 BASE_DIR = Path(__file__).resolve().parent
 COOKIE_NAME = "k"
+VISITOR_COOKIE = "vid"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 60  # 60 天
 DEFAULT_LENGTH = "标准（约600-800字）"
 
@@ -63,6 +65,31 @@ SSE_HEADERS = {
 
 
 # ------------------------------------------------------------------ 通用工具
+@app.middleware("http")
+async def ensure_visitor(request: Request, call_next):
+    """给每个浏览器发一个访客标识，用于统计免费试用次数。"""
+    visitor = request.cookies.get(VISITOR_COOKIE) or ""
+    is_new = not visitor
+    if is_new:
+        visitor = secrets.token_hex(16)
+    request.state.visitor = visitor
+    response = await call_next(request)
+    if is_new:
+        response.set_cookie(
+            VISITOR_COOKIE,
+            visitor,
+            max_age=COOKIE_MAX_AGE * 3,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+    return response
+
+
+def _visitor(request: Request) -> str:
+    return getattr(request.state, "visitor", "") or request.cookies.get(VISITOR_COOKIE, "")
+
+
 def _session(request: Request) -> tuple[dict | None, str | None]:
     token = request.cookies.get(COOKIE_NAME)
     if not token:
@@ -159,7 +186,10 @@ def activate_page(request: Request, code: str = ""):
     info, _ = _session(request)
     if info and not code:
         return RedirectResponse("/write", status_code=302)
-    return _page(info, request, "activate", "activate.html", {"code_value": code.strip()})
+    trial_left = store.trial_left(_visitor(request), settings.trial_uses)
+    return _page(
+        info, request, "activate", "activate.html", {"code_value": code.strip(), "trial_left": trial_left}
+    )
 
 
 @app.post("/activate", response_class=HTMLResponse)
@@ -172,7 +202,8 @@ def activate_submit(request: Request, code: str = Form("")):
             request,
             "activate",
             "activate.html",
-            {"error": result.message, "code_value": (code or "").strip()},
+            {"error": result.message, "code_value": (code or "").strip(),
+             "trial_left": store.trial_left(_visitor(request), settings.trial_uses)},
             status_code=400,
         )
     response = RedirectResponse("/write", status_code=303)
@@ -197,9 +228,10 @@ def logout():
 # ------------------------------------------------------------------ 写汇报
 @app.get("/write", response_class=HTMLResponse)
 def write_page(request: Request):
-    info, _token, redirect = _page_auth(request)
-    if redirect:
-        return redirect
+    info, _token = _session(request)
+    trial_left = store.trial_left(_visitor(request), settings.trial_uses)
+    if not info and trial_left <= 0:
+        return RedirectResponse("/activate", status_code=303)
     return _page(
         info,
         request,
@@ -212,13 +244,19 @@ def write_page(request: Request):
             "lengths": list(LENGTHS),
             "default_length": DEFAULT_LENGTH,
             "period_defaults": _period_defaults(),
+            "trial_mode": not info,
+            "trial_left": trial_left,
         },
     )
 
 
 @app.post("/api/generate")
 async def api_generate(request: Request):
-    info, token = _api_auth(request)
+    info, token = _session(request)
+    trial_mode = not info
+    visitor = _visitor(request)
+    if trial_mode and store.trial_left(visitor, settings.trial_uses) <= 0:
+        raise HTTPException(status_code=402, detail="免费试用已用完，激活兑换码后可继续使用")
     try:
         body = await request.json()
     except Exception:
@@ -244,7 +282,7 @@ async def api_generate(request: Request):
         length_key = DEFAULT_LENGTH
     if not period:
         period = default_period(report_type)
-    if info["remaining"] <= 0:
+    if not trial_mode and info["remaining"] <= 0:
         raise HTTPException(status_code=400, detail="可用次数已用完，请激活新的兑换码")
 
     messages = build_generation_prompt(
@@ -256,7 +294,7 @@ async def api_generate(request: Request):
         brief=brief,
         extra=extra,
     )
-    code = info["code"]
+    code = info["code"] if info else ""
 
     def stream():
         chunks: list[str] = []
@@ -279,6 +317,24 @@ async def api_generate(request: Request):
 
         guess = f"{position}{report_type}（{period}）"
         title = ensure_title(content, guess).splitlines()[0].lstrip("# ").strip() or guess
+
+        if trial_mode:
+            ok, left = store.consume_trial(visitor, settings.trial_uses)
+            if not ok:
+                yield _sse({"type": "error", "message": "免费试用已用完，激活兑换码后可继续使用"})
+                return
+            yield _sse(
+                {
+                    "type": "done",
+                    "trial": True,
+                    "report_id": None,
+                    "title": title,
+                    "remaining": left,
+                    "code": "",
+                }
+            )
+            return
+
         try:
             report_id = store.save_report(
                 code,

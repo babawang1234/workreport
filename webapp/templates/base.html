@@ -12,7 +12,7 @@
   <div class="topbar-inner">
     <a class="brand" href="{{ '/write' if info else '/activate' }}">
       <span class="brand-logo">报</span>
-      <span class="brand-text">汇报官<small>WorkBrief</small></span>
+      <span class="brand-text">汇报官<small>WorkBrief Agent</small></span>
     </a>
     {% if info %}
     <nav class="nav">
@@ -23,6 +23,10 @@
     <div class="top-right">
       <span class="quota-pill">{{ info.remaining }} 次可用</span>
       <a class="link-muted" href="/logout">退出</a>
+    </div>
+    {% else %}
+    <div class="top-right">
+      <a class="link-muted" href="/activate">兑换码激活</a>
     </div>
     {% endif %}
   </div>
