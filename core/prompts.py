@@ -207,6 +207,10 @@ def build_generation_prompt(
     if extra.strip():
         user += f"\n额外要求（优先级最高）：{extra.strip()}\n"
 
+    user += (
+        f"\n正文（不含标题）不少于 {int(target_words * 0.85)} 字，每个模块至少 3 条；"
+        "严格遵守只使用我提供的信息、不得编造数据的要求，缺数据用【待补充：xx】。"
+    )
     user += "\n请直接输出可以提交的汇报正文。"
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 

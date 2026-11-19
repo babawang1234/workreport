@@ -213,7 +213,8 @@ def main() -> int:
         f"{sudo}ln -sf /etc/nginx/sites-available/workbrief /etc/nginx/sites-enabled/workbrief; "
         f"{sudo}rm -f /etc/nginx/sites-enabled/default; "
         f"{sudo}nginx -t && {sudo}systemctl restart nginx && "
-        f"{sudo}systemctl daemon-reload && {sudo}systemctl enable --now workbrief && "
+        f"{sudo}systemctl daemon-reload && {sudo}systemctl enable workbrief && "
+        f"{sudo}systemctl restart workbrief && "
         "sleep 3 && systemctl is-active workbrief && "
         "curl -s -o /dev/null -w 'home:%{http_code}\\n' http://127.0.0.1/ && "
         "curl -s -o /dev/null -w 'activate:%{http_code}\\n' http://127.0.0.1/activate",

@@ -79,8 +79,9 @@ git push -u origin main
 3. `Deploy`，等 2~3 分钟，得到 `https://xxx.streamlit.app` 公网链接 —— 手机、电脑直接打开即可。
 
 > **零成本模型**：智谱开放平台的 Flash 系列目前免费额度较高（200K 上下文），OpenAI 兼容接口：
-> `LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"`、`LLM_MODEL = "glm-5.3-flash"`。
-> 这类模型是推理模型，务必再加一行 `LLM_MAX_TOKENS = "16384"`，否则推理过程会耗尽预算、正文为空。
+> `LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"`、`LLM_MODEL = "glm-4-flash"`。
+> 实测 `glm-4-flash` 生成一份周报约 15~20 秒；同系列的推理模型（如 `glm-5.3-flash`）首字要等 4~5 分钟，
+> 若必须用推理模型，需加 `LLM_MAX_TOKENS = "16384"`，否则推理过程会耗尽预算、正文为空。
 > 免费模型有并发和速率限制，单量起来后建议换成付费模型（DeepSeek / 通义，成本仍然很低）。
 
 ### 4. 上线自检
@@ -187,7 +188,7 @@ streamlit run admin.py
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
 | `LLM_API_KEY / LLM_BASE_URL / LLM_MODEL` | 模型接入（OpenAI 兼容） | `deepseek-chat` |
-| `LLM_TEMPERATURE / LLM_MAX_TOKENS` | 输出风格与长度上限（推理模型如 glm-5.3-flash 请设 16384；预算被推理耗尽时会自动用 16384 重试一次） | `0.5 / 2400` |
+| `LLM_TEMPERATURE / LLM_MAX_TOKENS` | 输出风格与长度上限（`glm-4-flash` 用 2400~4096 即可；推理模型如 glm-5.3-flash 需 16384，预算被推理耗尽时会自动用 16384 重试一次） | `0.5 / 2400` |
 | `DATABASE_URL` | 云 Postgres 连接串；留空则用本地 SQLite | 空 |
 | `SITE_URL` | 站点公网地址（支付回跳） | `http://localhost:8501` |
 | `EPAY_URL / EPAY_PID / EPAY_KEY` | 在线支付，留空则关闭 | — |
