@@ -76,6 +76,13 @@ def _now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _remaining(total: int, used: int) -> int:
+    """次数：total 为负数表示无限次（管理员账号），剩余统一用 -1 表示。"""
+    total = int(total)
+    used = int(used)
+    return -1 if total < 0 else max(0, total - used)
+
+
 def _conn():
     return connection()
 
@@ -132,7 +139,8 @@ def create_codes(
 ) -> list[str]:
     """批量生成兑换码。"""
     count = max(1, min(int(count), 200))
-    uses = max(1, min(int(uses), 100000))
+    uses = int(uses)
+    uses = -1 if uses < 0 else max(1, min(uses, 100000))
     prefix = (_normalize(prefix) or "RP")[:8]
     expires_at = None
     if expires_days and expires_days > 0:
@@ -193,8 +201,8 @@ def activate(raw_code: str, token: str) -> ActivateResult:
             return ActivateResult(False, "该兑换码已被停用，请联系客服")
         if _is_expired(row):
             return ActivateResult(False, "该兑换码已过期，请联系客服续费")
-        remaining = int(row["total"]) - int(row["used"])
-        if remaining <= 0:
+        remaining = _remaining(row["total"], row["used"])
+        if remaining == 0:
             return ActivateResult(False, "该兑换码次数已用完，请联系客服续费")
 
         if not token:
@@ -224,7 +232,7 @@ def session_info(token: str | None) -> dict | None:
         if not row["active"] or _is_expired(row):
             return None
         conn.execute("UPDATE sessions SET last_seen = ? WHERE token = ?", (_now(), token))
-    remaining = max(0, int(row["total"]) - int(row["used"]))
+    remaining = _remaining(row["total"], row["used"])
     return {
         "code": row["code"],
         "total": int(row["total"]),
@@ -243,19 +251,19 @@ def remaining_of(token: str | None) -> int:
 def consume(token: str) -> tuple[bool, int]:
     """扣减 1 次。返回 (是否成功, 剩余次数)。"""
     info = session_info(token)
-    if not info or info["remaining"] <= 0:
+    if not info or info["remaining"] == 0:
         return False, 0
     with _conn() as conn:
         cur = conn.execute(
             "UPDATE codes SET used = used + 1"
-            " WHERE code = ? AND active = 1 AND total - used > 0",
+            " WHERE code = ? AND active = 1 AND (total < 0 OR total - used > 0)",
             (info["code"],),
         )
         if cur.rowcount == 0:
             return False, 0
         conn.execute("UPDATE sessions SET last_seen = ? WHERE token = ?", (_now(), token))
     _log(info["code"], "generate")
-    left = info["remaining"] - 1
+    left = -1 if info["remaining"] < 0 else info["remaining"] - 1
     return True, left
 
 
@@ -306,7 +314,7 @@ def code_detail(raw_code: str) -> CodeInfo | None:
         code=row["code"],
         total=int(row["total"]),
         used=int(row["used"]),
-        remaining=max(0, int(row["total"]) - int(row["used"])),
+        remaining=_remaining(row["total"], row["used"]),
         active=bool(row["active"]),
         expires_at=row["expires_at"],
         note=row["note"],
@@ -326,7 +334,7 @@ def list_codes(keyword: str = "", limit: int = 300) -> list[CodeInfo]:
             code=r["code"],
             total=int(r["total"]),
             used=int(r["used"]),
-            remaining=max(0, int(r["total"]) - int(r["used"])),
+            remaining=_remaining(r["total"], r["used"]),
             active=bool(r["active"]),
             expires_at=r["expires_at"],
             note=r["note"],

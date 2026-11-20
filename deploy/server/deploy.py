@@ -38,18 +38,33 @@ WantedBy=multi-user.target
 
 NGINX = """server {{
     listen 80 default_server;
-    server_name _;
+    server_name {site_host} _;
     client_max_body_size 20m;
+
+    # 免费 HTTPS：证书就绪后这个片段里会自动追加 listen 443 ssl
+    include /etc/nginx/snippets/zhibao-ssl.conf;
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 512;
+    gzip_vary on;
+    gzip_types text/plain text/css text/xml application/javascript application/json application/xml image/svg+xml;
+
+    location ^~ /.well-known/acme-challenge/ {{
+        root /var/www/certbot;
+        default_type text/plain;
+    }}
 
     location /static/assets/ {{
         alias {app_dir}/assets/;
-        expires 7d;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
     }}
 
     location /static/ {{
         alias {app_dir}/webapp/static/;
-        expires 7d;
-        add_header Cache-Control "public";
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
     }}
 
     location / {{
@@ -66,7 +81,6 @@ NGINX = """server {{
 """
 
 ENV_KEYS = [
-    "DATABASE_URL",
     "LLM_API_KEY",
     "LLM_BASE_URL",
     "LLM_MODEL",
@@ -74,7 +88,12 @@ ENV_KEYS = [
     "SITE_URL",
     "SUPPORT_TEXT",
     "SUPPORT_WECHAT",
+    "TRIAL_USES",
     "ALIPAY_QR",
+    "WECHAT_QR",
+    "EPAY_URL",
+    "EPAY_PID",
+    "EPAY_KEY",
     "ADMIN_USER",
     "ADMIN_PASSWORD",
 ]
@@ -151,6 +170,7 @@ def main() -> int:
     parser.add_argument("--user", default="ubuntu")
     parser.add_argument("--port", type=int, default=22)
     parser.add_argument("--app-dir", default="/opt/workbrief")
+    parser.add_argument("--site-host", default="", help="用于 HTTPS 的域名，默认用 <ip 转横线>.sslip.io")
     args = parser.parse_args()
 
     if not args.password:
@@ -159,6 +179,7 @@ def main() -> int:
 
     load_dotenv()
     app_dir = args.app_dir.rstrip("/")
+    site_host = args.site_host or f"{args.host.replace('.', '-')}.sslip.io"
     sudo = "" if args.user == "root" else "sudo -n "
 
     print(f"连接 {args.user}@{args.host}:{args.port}")
@@ -172,6 +193,12 @@ def main() -> int:
         "python3 --version; nginx -v",
     )
     run(client, f"{sudo}mkdir -p {app_dir} && {sudo}chown -R {args.user}:{args.user} {app_dir}")
+    # 预先准备 HTTPS 片段与 ACME 校验目录，避免 nginx include 缺文件导致配置检查失败
+    run(
+        client,
+        f"{sudo}mkdir -p /var/www/certbot /etc/nginx/snippets && "
+        f"{sudo}touch /etc/nginx/snippets/zhibao-ssl.conf",
+    )
 
     print("\n上传代码...")
     sftp = client.open_sftp()
@@ -201,7 +228,7 @@ def main() -> int:
 
     for path, content, mode in [
         ("/etc/systemd/system/workbrief.service", SYSTEMD.format(app_dir=app_dir), 0o644),
-        ("/etc/nginx/sites-available/workbrief", NGINX.format(app_dir=app_dir), 0o644),
+        ("/etc/nginx/sites-available/workbrief", NGINX.format(app_dir=app_dir, site_host=site_host), 0o644),
     ]:
         tmp = f"/tmp/{Path(path).name}"
         with client.open_sftp().open(tmp, "w") as handle:

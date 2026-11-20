@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}写汇报 · 汇报官{% endblock %}
+{% block title %}写汇报 · 智报{% endblock %}
 {% block content %}
 {% if trial_mode %}
 <section class="trial-banner">
@@ -12,14 +12,24 @@
 </section>
 {% endif %}
 
+<section class="week-reminder hidden" id="week-reminder">
+  <span class="week-dot"></span>
+  <div>
+    <b>新的一周，先把上周周报补上</b>
+    <small>把上周的工作碎片粘进来，20 秒生成可直接提交的成稿。</small>
+  </div>
+  <button type="button" class="btn ghost sm" id="week-reminder-ok">知道了</button>
+</section>
+
 <section class="page-head">
   <div>
+    <span class="eyebrow">New report</span>
     <h1>写汇报</h1>
     <p class="muted">把聊天记录、待办、口语描述整段粘进去，越真实越好。</p>
   </div>
   <div class="page-head-side">
     {% if info %}
-    <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
+    <span class="quota-pill">{% if info.remaining < 0 %}剩余 无限 次{% else %}剩余 {{ info.remaining }} 次{% endif %}</span>
     <span class="muted small">兑换码 {{ info.code }}</span>
     {% else %}
     <span class="quota-pill trial">试用剩 {{ trial_left }} 次</span>
@@ -27,13 +37,40 @@
   </div>
 </section>
 
-<div class="grid">
+<div class="grid reveal">
   <section class="card">
     <h2 class="card-title">① 粘贴你的工作碎片</h2>
-    <form id="gen-form" class="stack" autocomplete="off">
+    <form id="gen-form" class="stack" autocomplete="off" data-code="{{ info.code if info else 'trial' }}">
       <label class="field">
         <textarea name="brief" rows="9" placeholder="随便写，越真实越好。例如：&#10;周一开产品评审会，方案改了 3 版；周二对接运营确认活动排期；&#10;周三处理 5 个客诉；周四输出 Q4 规划初稿；周五和技术对齐开发排期……"></textarea>
       </label>
+      <div class="quick-actions brief-tools">
+        <button type="button" class="chip" data-brief-frame>插入四段式框架</button>
+        <button type="button" class="chip" data-brief-parse>智能整理粘贴内容</button>
+        <button type="button" class="chip" data-brief-save-tpl>存为模板</button>
+        <button type="button" class="chip" data-brief-clear>清空</button>
+      </div>
+      <div class="tpl-row hidden" id="tpl-row">
+        <select id="tpl-select" aria-label="历史模板"></select>
+        <button type="button" class="btn ghost sm" id="tpl-apply">套用</button>
+        <button type="button" class="btn ghost sm" id="tpl-del">删除</button>
+      </div>
+      <p class="muted small" id="draft-tip">草稿会自动保存在本机浏览器，下次打开可以接着写。</p>
+
+      <details class="inbox" id="inbox">
+        <summary><span>本周素材收集箱</span><b id="inbox-count">0 条</b></summary>
+        <div class="inbox-body">
+          <div class="inline-form">
+            <input type="text" id="inbox-input" maxlength="120" placeholder="随手记：周二上线登录页，转化 +12%">
+            <button type="button" class="btn sm" id="inbox-add">记一条</button>
+          </div>
+          <ul class="inbox-list" id="inbox-list"></ul>
+          <div class="quick-actions">
+            <button type="button" class="btn sm primary" id="inbox-merge">汇总到输入框</button>
+            <button type="button" class="btn sm ghost" id="inbox-clear">清空收集箱</button>
+          </div>
+        </div>
+      </details>
 
       <div class="grid-2">
         <label class="field">
@@ -81,20 +118,31 @@
     <script type="application/json" id="period-defaults">{{ period_defaults | tojson }}</script>
   </section>
 
-  <section class="card">
-    <h2 class="card-title">② 汇报正文</h2>
-    <div id="empty-state" class="empty">
-      <span class="big">🗂️</span>
-      粘贴工作碎片，选好岗位与汇报类型<br>点「一键生成汇报」，30 秒拿到可直接提交的成稿
+  <section class="stack">
+    <div class="card">
+      <h2 class="card-title">② 汇报正文</h2>
+      <div id="empty-state" class="empty">
+        <span class="big">🗂️</span>
+        粘贴工作碎片，选好岗位与汇报类型<br>点「一键生成汇报」，20 秒拿到可直接提交的成稿
+      </div>
+      <div id="stream-box" class="stream-box hidden">
+        <pre id="stream-text" class="stream-text"></pre>
+      </div>
+      <div id="result-actions" class="result-actions hidden">
+        <button type="button" class="btn ghost" id="copy-btn">复制全文</button>
+        <a class="btn primary" href="/buy">购买次数，保存并微调</a>
+      </div>
+      <p class="muted small" id="stream-tip">生成完成后会自动跳转到报告详情页，可以继续微调、导出 Word。</p>
     </div>
-    <div id="stream-box" class="stream-box hidden">
-      <pre id="stream-text" class="stream-text"></pre>
+
+    <div class="card tips-card">
+      <h2 class="card-title">写得更像你的三个要点</h2>
+      <ul class="tip-list">
+        <li><b>先写结果，再写过程</b>“活动页转化提升 12%”比“做了活动页”更有说服力。</li>
+        <li><b>带上数字和名字</b>项目名、指标、时间点越具体，越不像模板。</li>
+        <li><b>选对岗位和汇报对象</b>同一件事，给直属上级和给部门负责人的写法不一样。</li>
+      </ul>
     </div>
-    <div id="result-actions" class="result-actions hidden">
-      <button type="button" class="btn ghost" id="copy-btn">复制全文</button>
-      <a class="btn primary" href="/buy">购买次数，保存并微调</a>
-    </div>
-    <p class="muted small" id="stream-tip">生成完成后会自动跳转到报告详情页，可以继续微调、导出 Word。</p>
   </section>
 </div>
 {% endblock %}

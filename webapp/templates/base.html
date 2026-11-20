@@ -4,15 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#4F46E5">
-  <title>{% block title %}汇报官{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>{% block title %}智报{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css?v=20261208">
+  <script>document.documentElement.classList.add("js");</script>
 </head>
 <body>
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="{{ '/write' if info else '/activate' }}">
-      <span class="brand-logo">报</span>
-      <span class="brand-text">汇报官<small>WorkBrief Agent</small></span>
+      <span class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <rect x="8" y="17.5" width="3.6" height="6.5" rx="1.8" fill="#fff" fill-opacity=".74"/>
+          <rect x="14.2" y="13" width="3.6" height="11" rx="1.8" fill="#fff" fill-opacity=".88"/>
+          <rect x="20.4" y="8.6" width="3.6" height="15.4" rx="1.8" fill="#fff"/>
+          <circle cx="22.2" cy="5.6" r="2.1" fill="#fff" fill-opacity=".92"/>
+        </svg>
+      </span>
+      <span class="brand-text">智报<small>ZhiBao Agent</small></span>
     </a>
     {% if info %}
     <nav class="nav">
@@ -21,11 +30,16 @@
       <a href="/buy" class="{{ 'on' if active == 'buy' else '' }}">购买次数</a>
     </nav>
     <div class="top-right">
-      <span class="quota-pill">{{ info.remaining }} 次可用</span>
+      <span class="quota-pill">{% if info.remaining < 0 %}无限次可用{% else %}{{ info.remaining }} 次可用{% endif %}</span>
       <a class="link-muted" href="/logout">退出</a>
     </div>
     {% else %}
+    <nav class="nav">
+      <a href="/write">免费试用</a>
+      <a href="/buy">价格与购买</a>
+    </nav>
     <div class="top-right">
+      <a class="btn primary sm" href="/buy">立即购买</a>
       <a class="link-muted" href="/activate">兑换码激活</a>
     </div>
     {% endif %}
@@ -36,7 +50,7 @@
 {% block content %}{% endblock %}
 </main>
 
-<footer class="foot">汇报官 · 兑换码即账号，换设备输入同一个码即可同步全部报告</footer>
-<script src="/static/app.js"></script>
+<footer class="foot">智报 · 兑换码即账号，换设备输入同一个码即可同步全部报告</footer>
+<script src="/static/app.js?v=20261208"></script>
 </body>
 </html>

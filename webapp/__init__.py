@@ -1,1 +1,1 @@
-"""汇报官 Web 版（FastAPI）。"""
+"""智报 Web 版（FastAPI）。"""

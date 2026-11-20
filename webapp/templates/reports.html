@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}我的报告 · 汇报官{% endblock %}
+{% block title %}我的报告 · 智报{% endblock %}
 {% block content %}
 <section class="page-head">
   <div>
@@ -7,7 +7,7 @@
     <p class="muted">账号 {{ info.code }} · 在手机或电脑输入同一个兑换码，可看到全部历史报告</p>
   </div>
   <div class="page-head-side">
-    <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
+    <span class="quota-pill">{% if info.remaining < 0 %}剩余 无限 次{% else %}剩余 {{ info.remaining }} 次{% endif %}</span>
     <a class="btn primary sm" href="/write">写新汇报</a>
   </div>
 </section>

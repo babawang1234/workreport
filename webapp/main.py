@@ -5,9 +5,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import html
 import json
 import secrets
+import time
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
@@ -18,14 +21,16 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
+    PlainTextResponse,
     RedirectResponse,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from core import llm, store
+from core import llm, payments, store
 from core.config import ROOT_DIR, get_settings
+from core.db import connection
 from core.exporter import ensure_title, md_to_docx
 from core.llm import LLMError
 from core.payments import PLANS, yuan
@@ -45,9 +50,14 @@ VISITOR_COOKIE = "vid"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 60  # 60 天
 DEFAULT_LENGTH = "标准（约600-800字）"
 
+# 简单的单 IP 生成限流：防止清 cookie 刷免费试用把大模型额度刷爆
+_GEN_WINDOW = 3600
+_GEN_LIMIT = 30
+_GEN_HITS: dict[str, list[float]] = {}
+
 store.init_db()
 
-app = FastAPI(title="汇报官", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="智报", docs_url=None, redoc_url=None, openapi_url=None)
 
 _assets_dir = ROOT_DIR / "assets"
 if _assets_dir.is_dir():
@@ -156,8 +166,8 @@ def _render_markdown(text: str) -> str:
     return md.markdown(html.escape(text or "", quote=False), extensions=["extra", "sane_lists"])
 
 
-def _qr_url() -> str:
-    qr = (settings.alipay_qr or "").strip()
+def _qr_url(value: str = "") -> str:
+    qr = (value or "").strip()
     if not qr:
         return ""
     if qr.startswith("http://") or qr.startswith("https://"):
@@ -174,6 +184,57 @@ def _title_of(record: dict) -> str:
     return f"{record.get('position', '')}{record.get('report_type', '')}（{record.get('period', '')}）".strip()
 
 
+# ------------------------------------------------------------------ 管理后台（人工确认到账）
+ADMIN_COOKIE = "zb_adm"
+ADMIN_MAX_AGE = 60 * 60 * 12
+
+
+def _admin_sig(user: str, ts: str) -> str:
+    key = (settings.admin_password or "zhibao").encode("utf-8")
+    return hmac.new(key, f"{user}|{ts}".encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _admin_authed(request: Request) -> bool:
+    parts = (request.cookies.get(ADMIN_COOKIE) or "").split("|")
+    if len(parts) != 3:
+        return False
+    user, ts, sig = parts
+    if not hmac.compare_digest(user, settings.admin_user):
+        return False
+    if not hmac.compare_digest(sig, _admin_sig(user, ts)):
+        return False
+    try:
+        issued = int(ts)
+    except ValueError:
+        return False
+    return time.time() - issued <= ADMIN_MAX_AGE
+
+
+def _orders_snapshot(limit: int = 80) -> tuple[list[dict], dict]:
+    conn = connection()
+    with conn:
+        rows = conn.execute(
+            "SELECT * FROM orders ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        stats = conn.execute(
+            "SELECT status, COUNT(*) AS c, COALESCE(SUM(amount), 0) AS total FROM orders GROUP BY status"
+        ).fetchall()
+    summary = {"pending": 0, "paid": 0, "pending_amount": 0, "paid_amount": 0}
+    for row in stats:
+        key = "paid" if row["status"] == "paid" else "pending"
+        summary[key] += int(row["c"] or 0)
+        summary[key + "_amount"] += int(row["total"] or 0)
+    orders = []
+    for row in rows:
+        item = dict(row)
+        item["amount_label"] = yuan(item["amount"])
+        item["channel_label"] = payments.CHANNELS.get(item.get("channel") or "", "扫码支付")
+        item["status_text"] = "已到账" if item["status"] == "paid" else "待确认"
+        item["claimed"] = (item.get("remark") or "").startswith("用户已点付款")
+        orders.append(item)
+    return orders, summary
+
+
 # ------------------------------------------------------------------ 首页 / 认证
 @app.get("/")
 def index(request: Request):
@@ -188,7 +249,15 @@ def activate_page(request: Request, code: str = ""):
         return RedirectResponse("/write", status_code=302)
     trial_left = store.trial_left(_visitor(request), settings.trial_uses)
     return _page(
-        info, request, "activate", "activate.html", {"code_value": code.strip(), "trial_left": trial_left}
+        info,
+        request,
+        "activate",
+        "activate.html",
+        {
+            "code_value": code.strip(),
+            "trial_left": trial_left,
+            "plans": [{**plan, "price_label": yuan(plan["price"])} for plan in PLANS],
+        },
     )
 
 
@@ -203,7 +272,8 @@ def activate_submit(request: Request, code: str = Form("")):
             "activate",
             "activate.html",
             {"error": result.message, "code_value": (code or "").strip(),
-             "trial_left": store.trial_left(_visitor(request), settings.trial_uses)},
+             "trial_left": store.trial_left(_visitor(request), settings.trial_uses),
+             "plans": [{**plan, "price_label": yuan(plan["price"])} for plan in PLANS]},
             status_code=400,
         )
     response = RedirectResponse("/write", status_code=303)
@@ -255,6 +325,15 @@ async def api_generate(request: Request):
     info, token = _session(request)
     trial_mode = not info
     visitor = _visitor(request)
+
+    ip = (request.headers.get("x-real-ip") or (request.client.host if request.client else "")).strip()
+    now_ts = time.time()
+    hits = [t for t in _GEN_HITS.get(ip, []) if now_ts - t < _GEN_WINDOW]
+    if len(hits) >= _GEN_LIMIT:
+        raise HTTPException(status_code=429, detail="生成太频繁，请稍后再试")
+    hits.append(now_ts)
+    _GEN_HITS[ip] = hits
+
     if trial_mode and store.trial_left(visitor, settings.trial_uses) <= 0:
         raise HTTPException(status_code=402, detail="免费试用已用完，激活兑换码后可继续使用")
     try:
@@ -282,7 +361,7 @@ async def api_generate(request: Request):
         length_key = DEFAULT_LENGTH
     if not period:
         period = default_period(report_type)
-    if not trial_mode and info["remaining"] <= 0:
+    if not trial_mode and info["remaining"] == 0:
         raise HTTPException(status_code=400, detail="可用次数已用完，请激活新的兑换码")
 
     messages = build_generation_prompt(
@@ -444,6 +523,46 @@ async def api_refine(report_id: int, request: Request):
     return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
+@app.post("/api/reports/{report_id}/edit")
+async def api_edit_report(report_id: int, request: Request):
+    """手动改标题/正文：不调用模型、不扣次数，保存后记入历史版本。"""
+    info, _token = _api_auth(request)
+    record = store.get_report(report_id, info["code"])
+    if not record:
+        raise HTTPException(status_code=404, detail="报告不存在或已删除")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="请求格式错误")
+
+    title = str(body.get("title") or "").strip()[:80]
+    content = str(body.get("content") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="标题不能为空")
+    if len(content) < 10:
+        raise HTTPException(status_code=400, detail="正文太短，至少写 10 个字")
+
+    if title == (record["title"] or "") and content == record["content"]:
+        return {"ok": True, "unchanged": True}
+
+    versions = _load_versions(record)
+    versions.append({"label": "手动修改", "text": content})
+    if len(versions) > 30:
+        versions = versions[-30:]
+
+    store.save_report(
+        info["code"],
+        title=title,
+        position=record["position"],
+        report_type=record["report_type"],
+        period=record["period"],
+        content=content,
+        versions=versions,
+        report_id=report_id,
+    )
+    return {"ok": True, "report_id": report_id}
+
+
 # ------------------------------------------------------------------ 我的报告
 @app.get("/reports", response_class=HTMLResponse)
 def reports_page(request: Request, q: str = "", start: str = "", end: str = ""):
@@ -538,9 +657,7 @@ def report_delete(report_id: int, request: Request):
 # ------------------------------------------------------------------ 购买次数
 @app.get("/buy", response_class=HTMLResponse)
 def buy_page(request: Request):
-    info, _token, redirect = _page_auth(request)
-    if redirect:
-        return redirect
+    info, _token = _session(request)
     plan_cards = [{**plan, "price_label": yuan(plan["price"])} for plan in PLANS]
     return _page(
         info,
@@ -549,32 +666,42 @@ def buy_page(request: Request):
         "buy.html",
         {
             "plans": plan_cards,
-            "qr_url": _qr_url(),
+            "alipay_qr_url": _qr_url(settings.alipay_qr),
+            "wechat_qr_url": _qr_url(settings.wechat_qr),
             "support_wechat": settings.support_wechat,
             "support_text": settings.support_text,
+            "auto_confirm": payments.gateway_ready(),
         },
     )
 
 
 @app.post("/api/orders")
 async def api_create_order(request: Request):
-    _api_auth(request)
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="请求格式错误")
 
     plan_id = str(body.get("plan_id") or "")
-    remark = str(body.get("remark") or "").strip()[:200]
+    channel = str(body.get("channel") or "alipay").strip().lower()
+    if channel not in payments.CHANNELS:
+        channel = "alipay"
     plan = next((p for p in PLANS if p["id"] == plan_id), None)
     if not plan:
         raise HTTPException(status_code=400, detail="请选择有效的套餐")
-    if not remark:
-        raise HTTPException(status_code=400, detail="请先填写付款备注或联系方式，方便客服核对")
 
     order_no = store.create_order(
-        plan["id"], plan["name"], plan["price"], plan["uses"], "alipay_qr", remark
+        plan["id"], plan["name"], plan["price"], plan["uses"], channel, ""
     )
+
+    pay_url = ""
+    if payments.gateway_ready():
+        result = payments.create_payment(
+            order_no, plan["name"], plan["price"], channel, f"{request.base_url}buy?order={order_no}"
+        )
+        pay_url = result.pay_url if result.ok else ""
+
+    qr = _qr_url(settings.alipay_qr if channel == "alipay" else settings.wechat_qr)
     return JSONResponse(
         {
             "order_no": order_no,
@@ -582,6 +709,11 @@ async def api_create_order(request: Request):
             "amount": yuan(plan["price"]),
             "uses": plan["uses"],
             "status": "pending",
+            "channel": channel,
+            "channel_label": payments.CHANNELS[channel],
+            "qr_url": qr,
+            "pay_url": pay_url,
+            "auto_confirm": payments.gateway_ready(),
             "support_wechat": settings.support_wechat,
             "support_text": settings.support_text,
         }
@@ -590,20 +722,127 @@ async def api_create_order(request: Request):
 
 @app.get("/api/orders/{order_no}")
 def api_get_order(order_no: str, request: Request):
-    _api_auth(request)
     order = store.get_order((order_no or "").strip())
     if not order:
         raise HTTPException(status_code=404, detail="订单号不存在，请检查后重试")
 
+    # 配置了支付网关时，主动查单，到账即自动发码（无需人工确认）
+    if order["status"] != "paid" and payments.gateway_ready():
+        if payments.check_paid(order["order_no"]):
+            store.mark_order_paid(order["order_no"], "epay")
+            order = store.get_order(order["order_no"]) or order
+
     paid = order["status"] == "paid" and bool(order["code"])
+    channel = order.get("channel") or "alipay"
+    qr = _qr_url(settings.alipay_qr if channel == "alipay" else settings.wechat_qr)
     return {
         "order_no": order["order_no"],
         "plan_name": order["plan_name"],
         "amount": yuan(order["amount"]),
         "uses": order["uses"],
         "status": order["status"],
-        "status_text": "已支付" if order["status"] == "paid" else "待确认",
+        "status_text": "已支付" if order["status"] == "paid" else "待确认到账",
         "created_at": order["created_at"],
+        "channel": channel,
+        "channel_label": payments.CHANNELS.get(channel, "扫码支付"),
+        "qr_url": qr,
+        "auto_confirm": payments.gateway_ready(),
+        "claimed": (order.get("remark") or "").startswith("用户已点付款"),
         "code": order["code"] if paid else "",
         "activate_url": f"/activate?code={quote(order['code'])}" if paid else "",
     }
+
+
+@app.post("/api/orders/{order_no}/claim")
+def api_claim_order(order_no: str):
+    """用户点「我已付款」：记录催单，管理后台可优先核对。"""
+    order = store.get_order((order_no or "").strip())
+    if not order:
+        raise HTTPException(status_code=404, detail="订单号不存在，请检查后重试")
+    if order["status"] == "paid" and order["code"]:
+        return {"ok": True, "paid": True, "code": order["code"]}
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    conn = connection()
+    with conn:
+        conn.execute(
+            "UPDATE orders SET remark = ? WHERE order_no = ?",
+            (f"用户已点付款 {stamp}", order["order_no"]),
+        )
+    return {"ok": True, "paid": False, "claimed_at": stamp}
+
+
+# ------------------------------------------------------------------ 管理后台
+@app.get("/admin", response_class=HTMLResponse)
+def admin_page(request: Request, ok: str = "", err: str = ""):
+    authed = _admin_authed(request)
+    orders: list[dict] = []
+    summary = {"pending": 0, "paid": 0, "pending_amount": 0, "paid_amount": 0}
+    if authed:
+        orders, summary = _orders_snapshot()
+    return templates.TemplateResponse(
+        request,
+        "admin.html",
+        {
+            "request": request,
+            "authed": authed,
+            "orders": orders,
+            "summary": summary,
+            "ok": ok,
+            "err": err,
+            "site_url": settings.site_url,
+        },
+    )
+
+
+@app.post("/admin/login")
+def admin_login(request: Request, username: str = Form(""), password: str = Form("")):
+    if username.strip() == settings.admin_user and password == settings.admin_password:
+        ts = str(int(time.time()))
+        token = f"{settings.admin_user}|{ts}|{_admin_sig(settings.admin_user, ts)}"
+        response = RedirectResponse("/admin", status_code=303)
+        response.set_cookie(
+            ADMIN_COOKIE, token, max_age=ADMIN_MAX_AGE, httponly=True, samesite="lax", path="/"
+        )
+        return response
+    return RedirectResponse("/admin?err=用户名或密码错误", status_code=303)
+
+
+@app.get("/admin/logout")
+def admin_logout():
+    response = RedirectResponse("/admin", status_code=303)
+    response.delete_cookie(ADMIN_COOKIE, path="/")
+    return response
+
+
+@app.post("/admin/orders/{order_no}/confirm")
+def admin_confirm(order_no: str, request: Request):
+    if not _admin_authed(request):
+        return RedirectResponse("/admin", status_code=303)
+    ok, code, message = store.mark_order_paid(order_no, "manual")
+    tip = f"已确认 {order_no}，兑换码 {code}" if ok else message
+    return RedirectResponse("/admin?ok=" + quote(tip), status_code=303)
+
+
+@app.api_route("/pay/notify", methods=["GET", "POST"])
+async def pay_notify(request: Request):
+    """易支付异步回调：验签 + 金额校验，通过后自动发码。"""
+    if not payments.gateway_ready():
+        return PlainTextResponse("fail", status_code=400)
+    params = dict(request.query_params) if request.method == "GET" else dict(await request.form())
+    order_no = str(params.get("out_trade_no") or "").strip()
+    order = store.get_order(order_no)
+    if not order:
+        return PlainTextResponse("fail", status_code=404)
+    if not payments.verify_sign(params):
+        return PlainTextResponse("fail", status_code=400)
+    if str(params.get("trade_status") or "") != "TRADE_SUCCESS":
+        return PlainTextResponse("fail", status_code=400)
+    try:
+        paid_cents = round(float(params.get("money") or 0) * 100)
+    except (TypeError, ValueError):
+        return PlainTextResponse("fail", status_code=400)
+    if paid_cents != int(order["amount"]):
+        return PlainTextResponse("fail", status_code=400)
+
+    store.mark_order_paid(order_no, "epay")
+    return PlainTextResponse("success")

@@ -52,6 +52,13 @@ def _default_qr() -> str:
     return ""
 
 
+def _default_wechat_qr() -> str:
+    for name in ("wechat_qr.png", "wechat_qr.jpg", "wechat_qr.jpeg"):
+        if (ROOT_DIR / "assets" / name).exists():
+            return f"assets/{name}"
+    return ""
+
+
 @dataclass(frozen=True)
 class Settings:
     api_key: str
@@ -73,6 +80,7 @@ class Settings:
     epay_pid: str
     epay_key: str
     alipay_qr: str
+    wechat_qr: str
 
 
 @lru_cache(maxsize=1)
@@ -92,12 +100,13 @@ def get_settings() -> Settings:
         max_refines=int(_secret("MAX_REFINES", "20") or 20),
         support_text=_secret("SUPPORT_TEXT", "如需购买或续费，请联系客服微信"),
         support_wechat=_secret("SUPPORT_WECHAT"),
-        trial_uses=int(_secret("TRIAL_USES", "2") or 2),
+        trial_uses=int(_secret("TRIAL_USES", "1") or 1),
         site_url=_secret("SITE_URL", "http://localhost:8501"),
         epay_url=_secret("EPAY_URL"),
         epay_pid=_secret("EPAY_PID"),
         epay_key=_secret("EPAY_KEY"),
         alipay_qr=_secret("ALIPAY_QR") or _default_qr(),
+        wechat_qr=_secret("WECHAT_QR") or _default_wechat_qr(),
     )
 
 

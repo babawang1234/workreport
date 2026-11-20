@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ record.title or '报告详情' }} · 汇报官{% endblock %}
+{% block title %}{{ record.title or '报告详情' }} · 智报{% endblock %}
 {% block content %}
 <section class="page-head">
   <div>
@@ -27,6 +27,26 @@
   </section>
 
   <aside class="stack-aside">
+    <section class="card">
+      <h2 class="card-title">手动微调 · 直接改字</h2>
+      <form id="edit-form" class="stack" data-report-id="{{ record.id }}" autocomplete="off">
+        <label class="field">
+          <span>标题</span>
+          <input type="text" name="title" value="{{ record.title }}" maxlength="80">
+        </label>
+        <label class="field">
+          <span>正文（支持 Markdown）</span>
+          <textarea name="content" rows="14">{{ record.content }}</textarea>
+        </label>
+        <div class="quick-actions">
+          <button type="submit" class="btn primary" id="edit-btn">保存修改</button>
+          <button type="button" class="btn ghost" id="edit-reset">撤销改动</button>
+        </div>
+        <div id="edit-status" class="status"></div>
+        <p class="muted small">标题和正文都能直接改，不扣次数；每次保存都会记入历史版本。</p>
+      </form>
+    </section>
+
     <section class="card">
       <h2 class="card-title">③ 不满意？直接说，我改</h2>
       {% if can_refine %}

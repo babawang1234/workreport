@@ -1,21 +1,26 @@
 {% extends "base.html" %}
-{% block title %}购买次数 · 汇报官{% endblock %}
+{% block title %}购买次数 · 智报{% endblock %}
 {% block content %}
-<section class="page-head">
+<section class="page-head reveal">
   <div>
     <h1>购买次数</h1>
     <p class="muted">兑换码就是你的账号：手机、电脑输入同一个码，剩余次数和历史报告实时同步。</p>
   </div>
   <div class="page-head-side">
-    <span class="quota-pill">剩余 {{ info.remaining }} 次</span>
+    {% if info %}
+    <span class="quota-pill">{% if info.remaining < 0 %}剩余 无限 次{% else %}剩余 {{ info.remaining }} 次{% endif %}</span>
     <span class="muted small">当前账号 {{ info.code }}</span>
+    {% else %}
+    <span class="quota-pill">无需登录 · 扫码付款，自动出码</span>
+    {% endif %}
   </div>
 </section>
 
-<form id="order-form" autocomplete="off">
+<form id="order-form" autocomplete="off" data-auto-confirm="{{ '1' if auto_confirm else '0' }}">
   <div class="plan-grid">
     {% for p in plans %}
-    <label class="plan-card {{ 'featured' if p.badge else '' }}">
+    <label class="plan-card {{ 'featured' if p.badge else '' }}"
+           data-name="{{ p.name }}" data-price="{{ p.price_label }}" data-uses="{{ p.uses }}">
       <input type="radio" name="plan_id" value="{{ p.id }}" {{ 'checked' if loop.first else '' }}>
       <span class="plan-badge {{ 'hidden' if not p.badge else '' }}">{{ p.badge or '占位' }}</span>
       <span class="plan-name">{{ p.name }}</span>
@@ -28,39 +33,99 @@
 
   <div class="pay-grid">
     <section class="card qr-card">
-      <h2 class="card-title">支付宝扫码付款</h2>
-      {% if qr_url %}
-      <img class="qr-img" src="{{ qr_url }}" alt="支付宝收款码">
-      <p class="muted small">付款时在备注里写上你的微信名或手机尾号，方便对账</p>
-      {% else %}
-      <div class="alert warn">收款码未就绪：请把图片放到 assets/alipay_qr.png，或配置 ALIPAY_QR。</div>
-      {% endif %}
+      <div class="pay-tabs" role="tablist" aria-label="选择支付方式">
+        <button type="button" class="pay-tab on" data-channel="alipay" role="tab" aria-selected="true">
+          <span class="pay-logo alipay">支</span>支付宝
+        </button>
+        <button type="button" class="pay-tab" data-channel="wxpay" role="tab" aria-selected="false">
+          <span class="pay-logo wxpay">微</span>微信支付
+        </button>
+      </div>
+
+      <div class="qr-stage" data-stage="alipay">
+        {% if alipay_qr_url %}
+        <img class="qr-img" src="{{ alipay_qr_url }}" alt="支付宝收款码">
+        <p class="qr-caption"><span class="qr-live"></span>支付宝扫码 · 支持花呗 / 余额</p>
+        {% else %}
+        <div class="alert warn">支付宝收款码未就绪：请把图片放到 assets/alipay_qr.png，或配置 ALIPAY_QR。</div>
+        {% endif %}
+      </div>
+
+      <div class="qr-stage hidden" data-stage="wxpay">
+        {% if wechat_qr_url %}
+        <img class="qr-img" src="{{ wechat_qr_url }}" alt="微信收款码">
+        <p class="qr-caption"><span class="qr-live"></span>微信扫码 · 支持零钱 / 银行卡</p>
+        {% else %}
+        <div class="alert warn">微信收款码未就绪：请把图片放到 assets/wechat_qr.png，或配置 WECHAT_QR。</div>
+        {% endif %}
+      </div>
+
+      <p class="muted small qr-hint">生成订单后再扫码，付款备注填订单号后 4 位，核对更快</p>
     </section>
 
-    <section class="card">
-      <h2 class="card-title">提交订单</h2>
-      <div class="stack">
-        <label class="field">
-          <span>付款备注 / 联系方式</span>
-          <input type="text" id="order-remark" maxlength="200" placeholder="例如：微信 wxid_abc 或 手机尾号 8899">
-        </label>
-        <button type="button" class="btn primary block" id="order-btn">我已付款，提交订单</button>
-        <div id="order-status" class="status"></div>
-        <p class="muted small">{{ support_text }}</p>
+    <section class="card pay-side">
+      <h2 class="card-title">订单摘要</h2>
+      <div class="pay-summary">
+        <div class="sum-row"><span>套餐</span><b id="sum-plan">{{ plans[0].name }}</b></div>
+        <div class="sum-row"><span>金额</span><b id="sum-amount" class="sum-price">¥{{ plans[0].price_label }}</b></div>
+        <div class="sum-row"><span>到账次数</span><b id="sum-uses">{{ plans[0].uses }} 次</b></div>
+        <div class="sum-row"><span>支付方式</span><b id="sum-channel">支付宝</b></div>
       </div>
+      <button type="button" class="btn primary block lg" id="order-btn">生成订单并开始扫码</button>
+      <div id="order-status" class="status"></div>
+      <p class="muted small pay-note">
+        {% if auto_confirm %}
+        生成订单后页面每 3 秒自动检查到账，到账即显示兑换码并可直接激活。
+        {% else %}
+        流程：生成订单 → 扫码付款 → 点「我已付款」→ 客服核对后页面自动出码（约 1-10 分钟）。
+        {% endif %}
+      </p>
     </section>
   </div>
 </form>
 
-<section id="order-result" class="card result hidden" data-wechat="{{ support_wechat }}">
-  <h2 class="card-title">订单已提交</h2>
-  <p class="muted">订单号（客服核对到账后自动发码）：</p>
-  <div class="order-no" id="order-no"></div>
+<section id="order-result" class="card result order-result hidden" data-wechat="{{ support_wechat }}">
+  <div class="result-head">
+    <h2 class="card-title" id="order-title">等待付款</h2>
+    <span class="order-badge waiting" id="order-badge"><i></i><span id="order-badge-text">等待到账</span></span>
+  </div>
+
+  <div class="order-body">
+    <div class="order-meta">
+      <div class="meta-item"><span>应付金额</span><b id="order-amount" class="meta-price">¥9.9</b></div>
+      <div class="meta-item"><span>到账次数</span><b id="order-uses">10 次</b></div>
+      <div class="meta-item wide"><span>订单号</span><b id="order-no" class="order-no"></b></div>
+    </div>
+    <div class="order-qr">
+      <img id="order-qr" class="qr-img" alt="收款码">
+      <span class="qr-caption" id="order-qr-label">支付宝</span>
+    </div>
+  </div>
+
   <p class="muted small" id="order-tip"></p>
-  <p class="muted small">用下面的「查询订单」粘贴订单号即可查看状态和兑换码。</p>
+
+  <div class="waiting" id="order-waiting">
+    <span class="waiting-dot"></span><span class="waiting-dot"></span><span class="waiting-dot"></span>
+    <span class="waiting-text">{% if auto_confirm %}每 3 秒自动检查到账，无需刷新页面{% else %}已付款请点下方按钮通知确认，页面每 3 秒自动检查{% endif %}</span>
+  </div>
+
+  <div class="claim-row" id="order-claim-row">
+    <button type="button" class="btn sm" id="order-claim">我已付款，通知确认</button>
+    <span class="muted small" id="order-claim-status">付款完成后点一下，客服会优先核对</span>
+  </div>
+
+  <div id="order-code-wrap" class="pay-success hidden">
+    <div class="success-mark">✓</div>
+    <div class="success-main">
+      <p class="muted small">付款成功，兑换码已自动发放</p>
+      <div class="order-no success-code" id="order-code"></div>
+      <p class="muted small">已到账 <b id="order-code-uses">10</b> 次生成，在任何设备输入此码即可使用。</p>
+      <a id="order-activate" class="btn primary block" href="#">用此码激活并开始写汇报</a>
+    </div>
+  </div>
 </section>
 
-<section class="card">
+<section class="card reveal">
   <h2 class="card-title">已付款？用订单号查兑换码</h2>
   <form id="query-form" class="inline-form" autocomplete="off">
     <input type="text" id="query-no" placeholder="粘贴订单号，例如 202611191530001234">

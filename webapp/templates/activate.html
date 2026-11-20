@@ -1,64 +1,253 @@
 {% extends "base.html" %}
-{% block title %}汇报官 · 把零散工作变成可直接提交的汇报{% endblock %}
+{% block title %}智报 · 把零散工作变成可直接提交的汇报{% endblock %}
 {% block content %}
-<section class="hero hero-activate">
+<section class="hero hero-activate reveal">
+  <div class="hero-aura" id="hero-aura" aria-hidden="true"></div>
   <div class="hero-main">
     <span class="hero-badge">工作汇报智能 Agent</span>
-    <h1>粘贴工作碎片<br>5 分钟搞定周报</h1>
+    <h1 class="hero-title title-ready" data-split>
+      <span class="hero-line">{% for ch in "粘贴工作碎片" %}<span class="ch-mask"><span class="ch" style="--i:{{ loop.index0 }}">{{ ch }}</span></span>{% endfor %}</span>
+      <span class="hero-line">{% for ch in "5" %}<span class="ch-mask"><span class="ch" style="--i:6">{{ ch }}</span></span>{% endfor %}<span class="ch-space"> </span>{% for ch in "分钟" %}<span class="ch-mask"><span class="ch" style="--i:{{ 7 + loop.index0 }}">{{ ch }}</span></span>{% endfor %}{% for ch in "搞定周报" %}<span class="ch-mask"><span class="ch grad" style="--i:{{ 9 + loop.index0 }};--gi:{{ loop.index0 }}">{{ ch }}</span></span>{% endfor %}</span>
+    </h1>
     <p class="hero-sub">聊天记录、待办清单、随口说的话，整段粘进来。<br>自动梳理成结构清晰、可直接提交的日报 / 周报 / 月报。</p>
     <div class="hero-actions">
       {% if trial_left > 0 %}
       <a class="btn primary lg" href="/write">免费试用 {{ trial_left }} 次，无需注册</a>
       {% else %}
-      <a class="btn primary lg" href="/buy">试用已用完，购买次数</a>
+      <a class="btn primary lg" href="/buy">试用已用完，立即购买</a>
       {% endif %}
-      <a class="btn ghost lg" href="#activate">我有兑换码</a>
+      <a class="btn ghost lg" href="#pricing">查看价格与购买</a>
+      <a class="hero-link" href="#activate">我有兑换码</a>
     </div>
     <div class="hero-stats">
-      <div><b>13</b><span>岗位话术风格</span></div>
-      <div><b>4</b><span>汇报类型</span></div>
-      <div><b>30 秒</b><span>出一份成稿</span></div>
+      <div><b data-count="13">13</b><span>岗位话术风格</span></div>
+      <div><b data-count="4">4</b><span>汇报类型</span></div>
+      <div><b data-count="20" data-suffix=" 秒">20 秒</b><span>出一份成稿</span></div>
     </div>
   </div>
-  <div class="hero-preview">
-    <div class="preview-head"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><em>产品经理 · 周报</em></div>
-    <div class="preview-body">
-      <h4>一、本周核心工作成果</h4>
-      <p><i class="tag">版本上线</i>跟进 V2.3 上线全流程，与测试对齐回归范围，修复 3 个阻塞问题</p>
-      <p><i class="tag">需求评审</i>完成数据看板需求梳理，输出评审材料</p>
-      <h4>二、遇到的问题与解决方案</h4>
-      <p><i class="tag">排期冲突</i>与研发重排优先级，确保核心链路按期交付</p>
-      <div class="preview-skeleton"></div>
-      <div class="preview-skeleton short"></div>
+  <div class="hero-stage" id="hero-stage">
+    <div class="stage-glow"></div>
+    <span class="preview-float top"><span class="tick">✓</span>4 个模块自动补齐</span>
+    <div class="demo-card" id="demo-card">
+      <div class="demo-top">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <em>写周报</em>
+        <span class="demo-live" id="demo-live">AI 待命</span>
+      </div>
+      <div class="demo-body">
+        <div class="demo-frags" id="demo-frags" aria-hidden="true">
+          <span class="demo-frag f1">登录页改版上线</span>
+          <span class="demo-frag f2">转化率 +12%</span>
+          <span class="demo-frag f3">修了 3 个阻塞</span>
+        </div>
+        <div class="demo-panel" id="demo-panel">
+          <div class="demo-panel-label">粘贴工作碎片<span class="demo-paste" id="demo-paste">已识别 3 条</span></div>
+          <div class="demo-text"><span id="demo-typed">登录页改版这周上线，转化率涨了 12%
+回归测试修掉 3 个阻塞问题
+下周做数据看板</span><i class="caret" id="demo-caret"></i></div>
+        </div>
+        <div class="demo-toolbar">
+          <span class="demo-select" id="demo-position">
+            <b id="demo-position-text">产品经理</b>
+            <span class="demo-menu">
+              <span data-option="产品经理">产品经理</span>
+              <span data-option="运营">运营</span>
+              <span data-option="销售">销售</span>
+            </span>
+          </span>
+          <span class="demo-select" id="demo-type">
+            <b id="demo-type-text">周报</b>
+            <span class="demo-menu">
+              <span data-option="日报">日报</span>
+              <span data-option="周报">周报</span>
+              <span data-option="月报">月报</span>
+            </span>
+          </span>
+          <span class="demo-btn" id="demo-btn">一键生成汇报</span>
+        </div>
+        <div class="demo-progress" id="demo-progress"><i></i></div>
+        <div class="doc-card" id="demo-doc">
+          <div class="doc-head">
+            <b id="demo-doc-title">产品经理 · 周报</b>
+            <span class="doc-export" id="demo-export">导出 Word</span>
+          </div>
+          <div class="doc-module">
+            <em>一、本周成果</em>
+            <div class="doc-line" style="--w:96%"></div>
+            <div class="doc-line" style="--w:82%"></div>
+          </div>
+          <div class="doc-module">
+            <em>二、问题与风险</em>
+            <div class="doc-line" style="--w:90%"></div>
+          </div>
+          <div class="doc-module">
+            <em>三、下周计划</em>
+            <div class="doc-line" style="--w:94%"></div>
+          </div>
+          <div class="doc-module">
+            <em>四、需要的支持</em>
+            <div class="doc-line" style="--w:78%"></div>
+            <span class="doc-tag">【待补充】</span>
+          </div>
+        </div>
+        <div class="demo-toast" id="demo-toast"><span class="tick">✓</span>周报.docx 已导出</div>
+      </div>
+      <svg class="demo-cursor" id="demo-cursor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 3l14 8-6 1.6L10.5 19 5 3z" fill="#111827" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="preview-float bottom"><span class="tick">✓</span>20 秒出成稿</span>
+  </div>
+</section>
+
+<section class="reveal carousel" id="flow" data-per="1">
+  <div class="flow-pin">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>三步，把碎片变成成稿</h2>
+    </div>
+    <div class="flow-body">
+      <div class="carousel-viewport">
+        <div class="steps" id="flow-track">
+        <div class="step">
+          <div class="step-copy">
+            <span class="step-num">1</span>
+            <div><b>粘贴工作碎片</b><small>聊天记录、待办、随手记，整段粘进来，不用整理</small></div>
+          </div>
+          <div class="step-demo sd-frags" aria-hidden="true">
+            <span class="sd-chip c1">登录页改版上线</span>
+            <span class="sd-chip c2">转化率 +12%</span>
+            <span class="sd-chip c3">修了 3 个阻塞</span>
+            <div class="sd-drop">
+              <span class="sd-drop-label">工作碎片输入框</span>
+              <i></i><i></i><i></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-copy">
+            <span class="step-num">2</span>
+            <div><b>选择岗位与类型</b><small>13 个岗位自动匹配重点，措辞直接可用</small></div>
+          </div>
+          <div class="step-demo sd-picks" aria-hidden="true">
+            <div class="sd-row">
+              <span class="sd-row-label">岗位</span>
+              <div class="sd-opts"><span>产品经理</span><span class="on">运营</span><span>销售</span><span>研发</span></div>
+            </div>
+            <div class="sd-row">
+              <span class="sd-row-label">类型</span>
+              <div class="sd-opts"><span>日报</span><span class="on">周报</span><span>月报</span></div>
+            </div>
+            <div class="sd-note"><i>✓</i>已匹配岗位话术与汇报重点</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-copy">
+            <span class="step-num">3</span>
+            <div><b>导出提交</b><small>四模块成稿，缺数据自动标注【待补充】</small></div>
+          </div>
+          <div class="step-demo sd-output" aria-hidden="true">
+            <div class="sd-doc">
+              <div class="sd-doc-head"><b>产品经理 · 周报</b><span class="sd-export">导出 Word</span></div>
+              <div class="sd-mod"><em>本周成果</em><i></i></div>
+              <div class="sd-mod"><em>问题与风险</em><i></i></div>
+              <div class="sd-mod"><em>下周计划</em><i></i></div>
+              <div class="sd-mod"><em>需要的支持</em><i></i><span class="sd-tag">【待补充】</span></div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+      </div>
+      <div class="carousel-nav">
+        <button type="button" class="carousel-arrow" data-dir="-1" aria-label="上一步">←</button>
+        <div class="carousel-dots" id="flow-dots" role="tablist" aria-label="三步流程翻页"></div>
+        <button type="button" class="carousel-arrow" data-dir="1" aria-label="下一步">→</button>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="steps">
-  <div class="step"><span class="step-num">1</span><div><b>粘贴工作碎片</b><small>聊天记录、待办，越真实越好</small></div></div>
-  <div class="step"><span class="step-num">2</span><div><b>选择岗位与类型</b><small>13 个岗位自动匹配重点</small></div></div>
-  <div class="step"><span class="step-num">3</span><div><b>导出提交</b><small>微调满意后导出 Word</small></div></div>
+<section class="reveal carousel" id="pricing" data-per="2">
+  <div class="price-pin">
+    <div class="section-head">
+      <span class="eyebrow">Pricing</span>
+      <h2>按次购买，最低 0.99 元一份</h2>
+    </div>
+    <div class="carousel-viewport">
+      <div class="plan-grid" id="plan-track">
+      {% for p in plans %}
+      <a class="plan-card {{ 'featured' if p.badge else '' }}" href="/buy">
+        <span class="plan-badge {{ 'hidden' if not p.badge else '' }}">{{ p.badge or '占位' }}</span>
+        <span class="plan-name">{{ p.name }}</span>
+        <span class="plan-price"><em>¥</em>{{ p.price_label }}</span>
+        <span class="plan-uses">{{ p.uses }} 次生成</span>
+        <span class="plan-desc">{{ p.desc }}</span>
+      </a>
+      {% endfor %}
+      </div>
+    </div>
+    <div class="carousel-nav">
+      <button type="button" class="carousel-arrow" data-dir="-1" aria-label="上一页">←</button>
+      <div class="carousel-dots" id="price-dots" role="tablist" aria-label="套餐翻页"></div>
+      <button type="button" class="carousel-arrow" data-dir="1" aria-label="下一页">→</button>
+    </div>
+    <div class="pricing-foot">
+      <a class="btn primary lg" href="/buy">去付款，选择套餐</a>
+      <span class="muted small">支持支付宝 / 微信 · 到账后自动出码</span>
+    </div>
+  </div>
 </section>
 
-<section class="card narrow" id="activate">
-  <h2 class="card-title">输入兑换码开始使用</h2>
-  <p class="muted">兑换码就是你的账号：手机和电脑输入同一个码，剩余次数和历史报告会自动同步。</p>
+<section class="activate-grid reveal" id="activate">
+  <div class="card activate-card">
+    <h2 class="card-title">输入兑换码开始使用</h2>
+    <p class="muted">兑换码就是你的账号：手机和电脑输入同一个码，剩余次数和历史报告会自动同步。</p>
 
-  <form method="post" action="/activate" class="stack">
-    <label class="field">
-      <span>兑换码</span>
-      <input type="text" name="code" value="{{ code_value }}" placeholder="例如 RP-8F3K2Q" autocomplete="off" autocapitalize="characters" required autofocus>
-    </label>
-    {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
-    <button type="submit" class="btn primary block lg">立即激活</button>
-  </form>
+    <form method="post" action="/activate" class="stack">
+      <label class="field">
+        <span>兑换码</span>
+        <input type="text" name="code" value="{{ code_value }}" placeholder="例如 RP-8F3K2Q" autocomplete="off" autocapitalize="characters" required>
+      </label>
+      {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+      <button type="submit" class="btn primary block lg">立即激活</button>
+    </form>
 
-  <p class="muted small">{{ settings.support_text }}{% if settings.support_wechat %}：{{ settings.support_wechat }}{% endif %}</p>
+    {% if trial_left > 0 %}
+    <p class="card-foot-link"><a href="/write">没有兑换码？先免费试用 {{ trial_left }} 次 →</a></p>
+    {% endif %}
+  </div>
+
+  <aside class="value-card">
+    <span class="eyebrow">Why ZhiBao</span>
+    <h3>一份能直接提交的汇报，不用再熬夜憋字</h3>
+    <ul class="value-list">
+      <li><span class="tick">✓</span><div><b>4 大固定模块</b>成果、问题、计划、需要的支持，一次补齐。</div></li>
+      <li><span class="tick">✓</span><div><b>13 种岗位话术</b>按岗位自动调整措辞和重点，不写成流水账。</div></li>
+      <li><span class="tick">✓</span><div><b>不编造数据</b>只使用你提供的信息，缺数据会标注【待补充】。</div></li>
+    </ul>
+    <p class="value-foot">{{ settings.support_text }}{% if settings.support_wechat %}：{{ settings.support_wechat }}{% endif %}</p>
+  </aside>
 </section>
 
-<section class="faq">
-  <details><summary>免费试用有什么限制？</summary><p>每个浏览器可免费生成 {{ settings.trial_uses }} 次，试用报告不保存；激活兑换码后自动保存，可随时微调、导出 Word。</p></details>
-  <details><summary>手机上能用吗？</summary><p>可以，页面自适应手机屏幕，输入同一个兑换码就能看到全部次数和历史报告。</p></details>
-  <details><summary>次数怎么算？</summary><p>每生成一份报告扣 1 次；同一份报告的微调不扣次数。</p></details>
+<section class="reveal" id="faq">
+  <div class="section-head center">
+    <span class="eyebrow">FAQ</span>
+    <h2>常见问题</h2>
+  </div>
+  <div class="faq">
+    <details><summary>免费试用有什么限制？</summary><p>每个浏览器可免费生成 {{ settings.trial_uses }} 次，试用报告不保存；激活兑换码后自动保存，可随时微调、导出 Word。</p></details>
+    <details><summary>手机上能用吗？</summary><p>可以，页面自适应手机屏幕，输入同一个兑换码就能看到全部次数和历史报告。</p></details>
+    <details><summary>次数怎么算？</summary><p>每生成一份报告扣 1 次；同一份报告的微调不扣次数。</p></details>
+  </div>
 </section>
+
+<nav class="scroll-rail" aria-label="页面章节">
+  <a href="#flow" data-rail="flow"><em>流程</em><i></i></a>
+  <a href="#pricing" data-rail="pricing"><em>价格</em><i></i></a>
+  <a href="#activate" data-rail="activate"><em>兑换码</em><i></i></a>
+  <a href="#faq" data-rail="faq"><em>常见问题</em><i></i></a>
+</nav>
 {% endblock %}

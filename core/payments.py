@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import time
 from dataclasses import dataclass
 
@@ -48,6 +49,17 @@ def _sign(params: dict[str, str], key: str) -> str:
     return hashlib.md5((raw + key).encode("utf-8")).hexdigest()
 
 
+def verify_sign(params: dict[str, str]) -> bool:
+    """校验易支付异步回调签名。"""
+    s = get_settings()
+    if not s.epay_key:
+        return False
+    sign = str(params.get("sign") or "")
+    if not sign:
+        return False
+    return hmac.compare_digest(_sign(params, s.epay_key), sign.lower())
+
+
 def _site_url() -> str:
     return (get_settings().site_url or "http://localhost:8501").rstrip("/")
 
@@ -72,7 +84,7 @@ def create_payment(
         "pid": s.epay_pid,
         "type": channel,
         "out_trade_no": order_no,
-        "notify_url": f"{_site_url()}/?pay=notify",
+        "notify_url": f"{_site_url()}/pay/notify",
         "return_url": return_url or f"{_site_url()}/?pay=return",
         "name": f"汇报官 {plan_name}",
         "money": f"{amount_cents / 100:.2f}",
@@ -113,7 +125,7 @@ def check_paid(order_no: str) -> bool:
 
 
 def notify_url_hint() -> str:
-    return f"{_site_url()}/?pay=notify"
+    return f"{_site_url()}/pay/notify"
 
 
 def wait_and_confirm(order_no: str, attempts: int = 3, interval: float = 1.5) -> bool:

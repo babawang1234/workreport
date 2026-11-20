@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}订单确认台 · 智报后台{% endblock %}
+{% block content %}
+<section class="page-head reveal">
+  <div>
+    <span class="eyebrow">Admin</span>
+    <h1>订单确认台</h1>
+    <p class="muted">用户扫码付款后，在这里核对到账并一键发放兑换码；页面每 30 秒自动刷新。</p>
+  </div>
+  <div class="page-head-side">
+    {% if authed %}
+    <a class="btn ghost sm" href="/admin/logout">退出后台</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if not authed %}
+<section class="card admin-login reveal">
+  <h2 class="card-title">管理员登录</h2>
+  {% if err %}<div class="alert err">{{ err }}</div>{% endif %}
+  <form method="post" action="/admin/login" class="stack" autocomplete="off">
+    <label class="field">
+      <span>用户名</span>
+      <input type="text" name="username" placeholder="admin" required>
+    </label>
+    <label class="field">
+      <span>密码</span>
+      <input type="password" name="password" placeholder="后台密码" required>
+    </label>
+    <button type="submit" class="btn primary block lg">登录后台</button>
+  </form>
+  <p class="muted small">账号密码来自部署环境的 ADMIN_USER / ADMIN_PASSWORD，可在 .env 中修改后重新部署。</p>
+</section>
+{% else %}
+
+{% if ok %}<div class="alert ok">{{ ok }}</div>{% endif %}
+{% if err %}<div class="alert err">{{ err }}</div>{% endif %}
+
+<section class="admin-stats reveal">
+  <div class="admin-stat">
+    <span>待确认订单</span>
+    <b>{{ summary.pending }}</b>
+    <small>金额 ¥{{ '%.2f'|format(summary.pending_amount / 100) }}</small>
+  </div>
+  <div class="admin-stat ok">
+    <span>已发放订单</span>
+    <b>{{ summary.paid }}</b>
+    <small>金额 ¥{{ '%.2f'|format(summary.paid_amount / 100) }}</small>
+  </div>
+  <div class="admin-stat">
+    <span>待确认中已催单</span>
+    <b>{{ orders | selectattr('claimed') | list | length }}</b>
+    <small>优先核对这部分</small>
+  </div>
+</section>
+
+<section class="card reveal">
+  <div class="admin-table-head">
+    <h2 class="card-title">最近订单</h2>
+    <span class="muted small">点「确认到账」即自动生成兑换码，用户页面 3 秒内自动显示</span>
+  </div>
+  <div class="admin-table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>订单号</th>
+          <th>套餐</th>
+          <th>金额</th>
+          <th>渠道</th>
+          <th>创建时间</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for o in orders %}
+        <tr class="{{ 'paid' if o.status == 'paid' else '' }}">
+          <td class="mono">{{ o.order_no }}</td>
+          <td>{{ o.plan_name }}<small class="muted"> · {{ o.uses }} 次</small></td>
+          <td class="mono">¥{{ o.amount_label }}</td>
+          <td>{{ o.channel_label }}</td>
+          <td class="mono small">{{ o.created_at }}</td>
+          <td>
+            {% if o.status == 'paid' %}
+              <span class="admin-badge paid">已到账</span>
+              <div class="mono small code-inline">{{ o.code }}</div>
+            {% else %}
+              <span class="admin-badge pending">待确认</span>
+              {% if o.claimed %}<div class="admin-claim">用户已点付款 · {{ o.remark }}</div>{% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if o.status == 'paid' %}
+              <a class="btn ghost sm" href="/activate?code={{ o.code }}">去激活</a>
+            {% else %}
+              <form method="post" action="/admin/orders/{{ o.order_no }}/confirm" class="admin-confirm">
+                <button type="submit" class="btn primary sm">确认到账</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      {% if not orders %}
+        <tr><td colspan="7" class="muted small">还没有订单。用户生成订单后会出现在这里。</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<p class="muted small admin-foot">核对建议：金额、时间与订单号后 4 位一致即可确认。此页面建议收藏到手机浏览器。</p>
+<script>setTimeout(function () { if (!document.hidden) location.reload(); }, 30000);</script>
+{% endif %}
+{% endblock %}
