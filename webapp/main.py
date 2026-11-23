@@ -19,6 +19,7 @@ from urllib.parse import quote
 import markdown as md
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
@@ -46,6 +47,7 @@ from core.prompts import (
 )
 
 BASE_DIR = Path(__file__).resolve().parent
+MARKETING_DIR = ROOT_DIR / "docs"
 COOKIE_NAME = "k"
 VISITOR_COOKIE = "vid"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 60  # 60 天
@@ -243,10 +245,28 @@ def _orders_snapshot(limit: int = 80) -> tuple[list[dict], dict]:
 
 
 # ------------------------------------------------------------------ 首页 / 认证
+_MARKETING_EXT = (".html", ".css", ".js", ".svg", ".png", ".jpg", ".ico", ".xml", ".txt")
+
+
+def _marketing_file(name: str) -> Path | None:
+    """把 docs/ 里的静态营销页映射成站点根路径，防止目录穿越。"""
+    if not name:
+        name = "index.html"
+    if not name.endswith(_MARKETING_EXT):
+        return None
+    base = MARKETING_DIR.resolve()
+    path = (base / name).resolve()
+    if path != base and base not in path.parents:
+        return None
+    return path if path.is_file() else None
+
+
 @app.get("/")
-def index(request: Request):
-    info, _ = _session(request)
-    return RedirectResponse("/write" if info else "/activate", status_code=302)
+def index():
+    page = _marketing_file("index.html")
+    if page:
+        return FileResponse(page)
+    return RedirectResponse("/activate", status_code=302)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -259,13 +279,28 @@ def robots_txt():
 def sitemap_xml():
     base = (settings.site_url or "").rstrip("/")
     today = datetime.now().strftime("%Y-%m-%d")
-    urls = ["/activate", "/buy", "/guide"]
+    urls = [
+        ("/", "1.0"),
+        ("/gongzuo-zongjie.html", "1.0"),
+        ("/zhoubao-moban.html", "0.9"),
+        ("/zhoubao-fanwen.html", "0.9"),
+        ("/yuebao-fanwen.html", "0.9"),
+        ("/shuzhi-baogao.html", "0.9"),
+        ("/shixi-zhoubao-fanwen.html", "0.9"),
+        ("/jidu-zongjie.html", "0.8"),
+        ("/zhoubao-kaitou.html", "0.8"),
+        ("/ribao-fanwen.html", "0.8"),
+        ("/zongjie-kaitou-jiewei.html", "0.8"),
+        ("/activate", "0.8"),
+        ("/buy", "0.8"),
+        ("/guide", "0.6"),
+    ]
     body = ['<?xml version="1.0" encoding="UTF-8"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for path in urls:
+    for path, priority in urls:
         body.append(
             f"<url><loc>{base}{path}</loc><lastmod>{today}</lastmod>"
-            f"<changefreq>weekly</changefreq><priority>{'1.0' if path == '/activate' else '0.8'}</priority></url>"
+            f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>"
         )
     body.append("</urlset>")
     return Response("\n".join(body), media_type="application/xml")
@@ -882,3 +917,13 @@ async def pay_notify(request: Request):
 
     store.mark_order_paid(order_no, "epay")
     return PlainTextResponse("success")
+
+
+# ------------------------------------------------------------------ 营销页兜底
+# 必须放在所有业务路由之后，保证 /write、/admin、/api 等不会被这里拦截。
+@app.get("/{full_path:path}")
+def marketing_page(full_path: str):
+    page = _marketing_file(full_path)
+    if page is None:
+        raise HTTPException(status_code=404, detail="页面不存在")
+    return FileResponse(page)
