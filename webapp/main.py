@@ -261,7 +261,7 @@ def _marketing_file(name: str) -> Path | None:
     return path if path.is_file() else None
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def index():
     page = _marketing_file("index.html")
     if page:
@@ -921,7 +921,7 @@ async def pay_notify(request: Request):
 
 # ------------------------------------------------------------------ 营销页兜底
 # 必须放在所有业务路由之后，保证 /write、/admin、/api 等不会被这里拦截。
-@app.get("/{full_path:path}")
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
 def marketing_page(full_path: str):
     page = _marketing_file(full_path)
     if page is None:
