@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: zhibao
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements-web.txt
+    startCommand: uvicorn webapp.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DATABASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://open.bigmodel.cn/api/paas/v4
+      - key: LLM_MODEL
+        value: glm-4-flash
+      - key: LLM_MAX_TOKENS
+        value: "16384"
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SITE_URL
+        sync: false
+      - key: SUPPORT_TEXT
+        value: 付款遇到问题请联系客服
+      - key: SUPPORT_WECHAT
+        value: "15810888368"
+      - key: TRIAL_USES
+        value: "1"
