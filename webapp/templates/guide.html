@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}周报怎么写？AI 写周报的 4 个模块与模板 - 智报{% endblock %}
+{% block description %}周报怎么写才能不被说流水账？拆解成果、问题、计划、需要的支持四个模块，附可直接套用的周报模板，以及用 AI 把碎片整理成成稿的实操方法。{% endblock %}
+{% block og_title %}周报怎么写？AI 写周报的 4 个模块与模板 - 智报{% endblock %}
+{% block og_desc %}成果、问题、计划、需要的支持：四个模块写清楚，周报就不会被说流水账。{% endblock %}
+{% block content %}
+<section class="hero hero-activate reveal">
+  <div class="hero-main">
+    <span class="hero-badge">周报写作指南</span>
+    <h1 class="hero-title" style="font-size:clamp(26px,3.4vw,42px)">周报怎么写，才不像流水账</h1>
+    <p class="hero-sub">领导看周报只关心三件事：做成了什么、卡在哪、下周要什么支持。<br>把这三件事写清楚，比写满两页字更有用。</p>
+    <div class="hero-actions">
+      <a class="btn primary lg" href="/activate">用智报 20 秒写一份</a>
+      <a class="btn ghost lg" href="/buy">查看价格</a>
+    </div>
+  </div>
+</section>
+
+<section class="card reveal" style="margin-top:24px">
+  <h2 class="card-title">一、周报的四个固定模块</h2>
+  <p class="muted">绝大多数岗位的周报都可以拆成四个模块，顺序不要乱：</p>
+  <ul class="value-list">
+    <li><span class="tick">1</span><div><b>本周成果</b>：只写做完的事，带结果和数据，例如「登录页改版上线，转化率 +12%」。</div></li>
+    <li><span class="tick">2</span><div><b>问题与风险</b>：写卡点和影响面，说明你已经尝试过什么，别只抛问题。</div></li>
+    <li><span class="tick">3</span><div><b>下周计划</b>：3 到 5 条，每条有明确交付物和时间点。</div></li>
+    <li><span class="tick">4</span><div><b>需要的支持</b>：需要谁配合、要什么资源，一次说清，避免会上再问一遍。</div></li>
+  </ul>
+
+  <h2 class="card-title" style="margin-top:28px">二、为什么你的周报像流水账</h2>
+  <p class="muted">流水账的典型特征是「按时间罗列动作」：周一开会、周二改稿、周三对接。领导无法从中判断价值。改法是把动作翻译成结果——</p>
+  <ul class="value-list">
+    <li><span class="tick">✕</span><div>「本周对接了设计，改了 3 版页面」</div></li>
+    <li><span class="tick">✓</span><div>「首页改版定稿，预计上线后注册转化提升 8%」</div></li>
+  </ul>
+
+  <h2 class="card-title" style="margin-top:28px">三、用 AI 写周报的正确姿势</h2>
+  <p class="muted">AI 写不出你没提供的信息。有效的做法是先把「碎片」全部倒出来：聊天记录、待办清单、随口说的话，越原始越好；再让 AI 按上面的四个模块归类、提炼、补上措辞。缺数据的地方要明确标注【待补充】，而不是让 AI 编一个数字。</p>
+  <p class="muted">智报就是按这个流程做的：粘贴碎片 → 选岗位和汇报类型 → 20 秒出四模块成稿 → 导出 Word。13 种岗位话术会自动调整重点，比如运营偏数据、研发偏进度与风险、销售偏业绩与客户。</p>
+
+  <h2 class="card-title" style="margin-top:28px">四、常见问题</h2>
+  <p class="muted"><b>周报写多少字合适？</b>一般 400–800 字，重点在结论，细节放附件。</p>
+  <p class="muted"><b>没有数据怎么办？</b>写清「做了什么、影响到谁」，并标注待补充的数据项，比编数字安全。</p>
+  <p class="muted"><b>日报、周报、月报要重写吗？</b>不用。同一批碎片可以生成三种粒度，周报重结果、月报重趋势。</p>
+
+  <div class="pricing-foot" style="margin-top:24px">
+    <a class="btn primary lg" href="/activate">免费试用，粘贴碎片试试</a>
+    <span class="muted small">无需注册 · 兑换码即账号</span>
+  </div>
+</section>
+{% endblock %}

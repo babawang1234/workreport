@@ -23,6 +23,7 @@ from fastapi.responses import (
     JSONResponse,
     PlainTextResponse,
     RedirectResponse,
+    Response,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -126,7 +127,13 @@ def _sse(payload: dict) -> str:
 
 
 def _page(info: dict, request: Request, active: str, template: str, context: dict | None = None, **kwargs):
-    data = {"request": request, "info": info, "active": active, "settings": settings}
+    data = {
+        "request": request,
+        "info": info,
+        "active": active,
+        "settings": settings,
+        "site_url": (settings.site_url or "").rstrip("/"),
+    }
     if context:
         data.update(context)
     return templates.TemplateResponse(request, template, data, **kwargs)
@@ -240,6 +247,35 @@ def _orders_snapshot(limit: int = 80) -> tuple[list[dict], dict]:
 def index(request: Request):
     info, _ = _session(request)
     return RedirectResponse("/write" if info else "/activate", status_code=302)
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt():
+    base = (settings.site_url or "").rstrip("/")
+    return f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {base}/sitemap.xml\n"
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    base = (settings.site_url or "").rstrip("/")
+    today = datetime.now().strftime("%Y-%m-%d")
+    urls = ["/activate", "/buy", "/guide"]
+    body = ['<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for path in urls:
+        body.append(
+            f"<url><loc>{base}{path}</loc><lastmod>{today}</lastmod>"
+            f"<changefreq>weekly</changefreq><priority>{'1.0' if path == '/activate' else '0.8'}</priority></url>"
+        )
+    body.append("</urlset>")
+    return Response("\n".join(body), media_type="application/xml")
+
+
+@app.get("/guide", response_class=HTMLResponse)
+def guide_page(request: Request):
+    info, _ = _session(request)
+    return _page(info, request, "guide", "guide.html")
+
 
 
 @app.get("/activate", response_class=HTMLResponse)
