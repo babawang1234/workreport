@@ -195,6 +195,7 @@ def _title_of(record: dict) -> str:
 
 # ------------------------------------------------------------------ 管理后台（人工确认到账）
 ADMIN_COOKIE = "zb_adm"
+ADMIN_BASE = "/zb-manage-2026"
 ADMIN_MAX_AGE = 60 * 60 * 12
 
 
@@ -843,7 +844,7 @@ def api_claim_order(order_no: str):
 
 
 # ------------------------------------------------------------------ 管理后台
-@app.get("/admin", response_class=HTMLResponse)
+@app.get(ADMIN_BASE, response_class=HTMLResponse)
 def admin_page(request: Request, ok: str = "", err: str = ""):
     authed = _admin_authed(request)
     orders: list[dict] = []
@@ -861,37 +862,38 @@ def admin_page(request: Request, ok: str = "", err: str = ""):
             "ok": ok,
             "err": err,
             "site_url": settings.site_url,
+            "admin_base": ADMIN_BASE,
         },
     )
 
 
-@app.post("/admin/login")
+@app.post(ADMIN_BASE + "/login")
 def admin_login(request: Request, username: str = Form(""), password: str = Form("")):
     if username.strip() == settings.admin_user and password == settings.admin_password:
         ts = str(int(time.time()))
         token = f"{settings.admin_user}|{ts}|{_admin_sig(settings.admin_user, ts)}"
-        response = RedirectResponse("/admin", status_code=303)
+        response = RedirectResponse(ADMIN_BASE, status_code=303)
         response.set_cookie(
             ADMIN_COOKIE, token, max_age=ADMIN_MAX_AGE, httponly=True, samesite="lax", path="/"
         )
         return response
-    return RedirectResponse("/admin?err=用户名或密码错误", status_code=303)
+    return RedirectResponse(ADMIN_BASE + "?err=用户名或密码错误", status_code=303)
 
 
-@app.get("/admin/logout")
+@app.get(ADMIN_BASE + "/logout")
 def admin_logout():
-    response = RedirectResponse("/admin", status_code=303)
+    response = RedirectResponse(ADMIN_BASE, status_code=303)
     response.delete_cookie(ADMIN_COOKIE, path="/")
     return response
 
 
-@app.post("/admin/orders/{order_no}/confirm")
+@app.post(ADMIN_BASE + "/orders/{order_no}/confirm")
 def admin_confirm(order_no: str, request: Request):
     if not _admin_authed(request):
-        return RedirectResponse("/admin", status_code=303)
+        return RedirectResponse(ADMIN_BASE, status_code=303)
     ok, code, message = store.mark_order_paid(order_no, "manual")
     tip = f"已确认 {order_no}，兑换码 {code}" if ok else message
-    return RedirectResponse("/admin?ok=" + quote(tip), status_code=303)
+    return RedirectResponse(ADMIN_BASE + "?ok=" + quote(tip), status_code=303)
 
 
 @app.api_route("/pay/notify", methods=["GET", "POST"])

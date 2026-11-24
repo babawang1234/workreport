@@ -9,7 +9,7 @@
   </div>
   <div class="page-head-side">
     {% if authed %}
-    <a class="btn ghost sm" href="/admin/logout">退出后台</a>
+    <a class="btn ghost sm" href="{{ admin_base }}/logout">退出后台</a>
     {% endif %}
   </div>
 </section>
@@ -18,7 +18,7 @@
 <section class="card admin-login reveal">
   <h2 class="card-title">管理员登录</h2>
   {% if err %}<div class="alert err">{{ err }}</div>{% endif %}
-  <form method="post" action="/admin/login" class="stack" autocomplete="off">
+  <form method="post" action="{{ admin_base }}/login" class="stack" autocomplete="off">
     <label class="field">
       <span>用户名</span>
       <input type="text" name="username" placeholder="admin" required>
@@ -93,7 +93,7 @@
             {% if o.status == 'paid' %}
               <a class="btn ghost sm" href="/activate?code={{ o.code }}">去激活</a>
             {% else %}
-              <form method="post" action="/admin/orders/{{ o.order_no }}/confirm" class="admin-confirm">
+              <form method="post" action="{{ admin_base }}/orders/{{ o.order_no }}/confirm" class="admin-confirm">
                 <button type="submit" class="btn primary sm">确认到账</button>
               </form>
             {% endif %}
