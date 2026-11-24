@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>程序员周报范文 - 进度、风险与技术债 | 智报</title>
+  <meta name="description" content="程序员周报别只写“修了 bug”。给出开发周报四段结构（需求进展、关键技术决策、风险与阻塞、下周排期）、bug 与排查的写法、技术债如何量化，附一份完整研发周报范文。">
+  <meta name="keywords" content="程序员周报,开发周报,技术周报,程序员工作总结,研发周报">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://zhibaozb.top/chengxuyuan-zhoubao.html">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <style>html,body{overflow-x:clip} .doc p{color:var(--muted);line-height:1.85} .doc li{color:var(--muted);line-height:1.9}</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><rect x="8" y="17.5" width="3.6" height="6.5" rx="1.8" fill="#fff" fill-opacity=".74"/><rect x="14.2" y="13" width="3.6" height="11" rx="1.8" fill="#fff" fill-opacity=".88"/><rect x="20.4" y="8.6" width="3.6" height="15.4" rx="1.8" fill="#fff"/><circle cx="22.2" cy="5.6" r="2.1" fill="#fff" fill-opacity=".92"/></svg></span>
+      <span class="brand-text">智报<small>ZhiBao Agent</small></span>
+    </a>
+    <nav class="nav"><a href="/">首页</a><a href="zhoubao-moban.html">周报模板</a><a href="zhoubao-fanwen.html">周报范文</a></nav>
+    <div class="top-right"><a class="btn primary sm" href="/write">免费试用</a></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero hero-activate">
+    <div class="hero-main">
+      <span class="hero-badge">开发周报</span>
+      <h1 class="hero-title title-ready"><span class="hero-line">程序员周报</span><span class="hero-line"><em class="grad ch">别只写“修了 bug”</em></span></h1>
+      <p class="hero-sub">进度、决策、风险、排期。让非技术的领导也看得出你这周的含金量。</p>
+      <div class="hero-actions"><a class="btn primary lg" href="/write">AI 帮我写周报</a><a class="btn ghost lg" href="zhoubao-moban.html">看周报模板</a></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head"><span class="eyebrow">Structure</span><h2>开发周报的四段</h2></div>
+    <div class="card doc">
+      <ol>
+        <li><b>需求进展。</b>需求名、状态、完成度。例：订单导出重构，开发完成 80%，接口联调通过，剩权限校验，周三提测。</li>
+        <li><b>关键技术决策。</b>选了什么、为什么、代价是什么。例：导出改为异步任务加分片，10 万行从 90 秒降到 12 秒，代价是新增一个任务队列。</li>
+        <li><b>风险与阻塞。</b>卡在哪、影响谁、需要谁支持、备选方案是什么。</li>
+        <li><b>下周排期。</b>具体到需求和时间点，不写“继续开发”。</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head"><span class="eyebrow">Bug</span><h2>“调了一天 bug”怎么写出信息量</h2></div>
+    <div class="card doc">
+      <p>写清三件事：<b>现象、根因、影响面。</b>“修复线上 bug 一个”这七个字，等于告诉领导你今天没产出。</p>
+      <p><b>反例：</b>“排查并修复订单模块问题。”</p>
+      <p><b>正例：</b>“修复订单金额偶发为 0 的问题。根因是并发下优惠券与商品金额同时写入，后写覆盖先写；影响 3 天内 17 笔订单，已补数据。加行锁并补了并发单测，同类问题不会复发。”</p>
+      <p>一天的价值不在于“修好了”，而在于“以后不会再犯”。能说清根因的人，和只会重启服务的人，在周报里一眼就分得开。</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head"><span class="eyebrow">Tech Debt</span><h2>技术债和代码质量怎么写</h2></div>
+    <div class="card doc">
+      <p>不要写“优化了代码”，要写<b>欠了什么、还了多少、怎么量化</b>。</p>
+      <p><b>量化示例：</b>把 1,200 行的订单服务拆成 3 个模块，核心方法平均圈复杂度从 28 降到 11；补 42 个单测，覆盖率从 31% 提到 58%。</p>
+      <p><b>要说清不还的后果：</b>导出逻辑散在 5 个文件里，每加一个字段改 5 处，本月已因此出过 1 次漏字段事故。</p>
+      <p><b>小步还债也要报：</b>本周把 8 处硬编码配置挪到配置中心，下次调价不用发版。这类事领导平时看不见，写进周报才变成你的产出。</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head"><span class="eyebrow">Sample</span><h2>一份完整范文</h2></div>
+    <div class="card doc">
+      <p><b>一、需求进展</b><br>1. 订单导出重构：开发完成 80%，接口联调通过，剩权限校验与前端联调，预计周三提测。<br>2. 会员等级改版：评审完成，表结构已设计，开发未开始。<br>3. 线上问题：修复 2 个，均为 P2。</p>
+      <p><b>二、关键技术决策</b><br>导出改为异步任务加分片处理，10 万行导出从 90 秒降到 12 秒，超时告警基本消失。代价是新增任务队列，运维已确认资源。</p>
+      <p><b>三、风险与阻塞</b><br>权限校验依赖权限中心接口，对方本周在改鉴权模型，字段可能变化。已约定周五前给最终版；若延期，导出先按旧权限上线，风险可控。</p>
+      <p><b>四、下周排期</b><br>周一至周三完成权限校验并提测；周四配合测试修问题；周五灰度 10%。会员等级改版下周一进入开发。</p>
+      <p><b>另：</b>修复订单金额偶发为 0 的问题，根因是并发写入覆盖，影响 17 笔订单，已补数据并加行锁与并发单测。</p>
+      <p>把 Jira 记录和提交日志贴进 <a href="/write">智报</a>，会自动按这四段整理，需求名和排期缺的地方标【待补充】，不会编造进度。</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head"><span class="eyebrow">Related</span><h2>相关内容</h2></div>
+    <div class="card doc">
+      <p><a href="zhoubao-fanwen.html">周报范文</a> · <a href="zhoubao-moban.html">周报模板</a> · <a href="ai-zhoubao.html">智能周报</a></p>
+      <p><a href="zhoubao-kaitou.html">周报开头怎么写</a> · <a href="gongzuo-zongjie.html">工作总结</a> · <a href="shuzhi-baogao.html">述职报告</a> · <a href="jidu-zongjie.html">季度总结</a></p>
+    </div>
+  </section>
+</main>
+<footer class="foot">智报 · <a href="/">首页</a> · <a href="zhoubao-zenme-xie.html">周报怎么写</a> · <a href="zhoubao-moban.html">周报模板</a> · <a href="zhoubao-fanwen.html">周报范文</a> · <a href="ribao-fanwen.html">日报范文</a> · <a href="yuebao-fanwen.html">月报范文</a> · <a href="jidu-zongjie.html">季度总结</a> · <a href="shuzhi-baogao.html">述职报告</a> · <a href="shixi-zhoubao-fanwen.html">实习周报</a> · <a href="gongzuo-zongjie.html">工作总结</a> · <a href="ai-zhoubao.html">智能周报</a></footer>
+</body>
+</html>
