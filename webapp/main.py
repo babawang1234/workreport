@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import markdown as md
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -57,6 +57,11 @@ DEFAULT_LENGTH = "标准（约450-550字）"
 _GEN_WINDOW = 3600
 _GEN_LIMIT = 30
 _GEN_HITS: dict[str, list[float]] = {}
+
+# 语音转写单 IP 限流：防止刷转写接口烧 ASR 额度
+_ASR_WINDOW = 3600
+_ASR_LIMIT = 60
+_ASR_HITS: dict[str, list[float]] = {}
 
 store.init_db()
 
@@ -493,6 +498,34 @@ async def api_generate(request: Request):
         )
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
+
+
+@app.post("/api/transcribe")
+async def api_transcribe(request: Request, file: UploadFile = File(...)):
+    """语音转文字：前端按住说话录音上传，返回识别文本，供填入输入框后生成。"""
+    ip = (request.headers.get("x-real-ip") or (request.client.host if request.client else "")).strip()
+    now_ts = time.time()
+    hits = [t for t in _ASR_HITS.get(ip, []) if now_ts - t < _ASR_WINDOW]
+    if len(hits) >= _ASR_LIMIT:
+        raise HTTPException(status_code=429, detail="语音转写太频繁，请稍后再试")
+    hits.append(now_ts)
+    _ASR_HITS[ip] = hits
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="没有收到音频")
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="音频过大（限 25MB）")
+
+    try:
+        text = llm.transcribe(data, (file.filename or "audio.wav"))
+    except LLMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="没有识别到内容，请重新说一次")
+    return {"text": text}
 
 
 @app.post("/api/refine/{report_id}")

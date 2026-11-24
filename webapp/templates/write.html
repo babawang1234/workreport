@@ -44,6 +44,17 @@
       <label class="field">
         <textarea name="brief" rows="9" placeholder="随便写，越真实越好。例如：&#10;周一开产品评审会，方案改了 3 版；周二对接运营确认活动排期；&#10;周三处理 5 个客诉；周四输出 Q4 规划初稿；周五和技术对齐开发排期……"></textarea>
       </label>
+      <div class="voice-row">
+        <button type="button" class="voice-btn" id="voice-btn">
+          <span class="voice-icon">🎙️</span>
+          <span class="voice-label">按住说话</span>
+        </button>
+        <span class="voice-hint muted small">按住说出本周工作，松手自动转成文字填入输入框（最长 30 秒）</span>
+        <label class="voice-auto">
+          <input type="checkbox" id="voice-auto">
+          <span>识别后自动生成</span>
+        </label>
+      </div>
       <div class="quick-actions brief-tools">
         <button type="button" class="chip" data-brief-frame>插入四段式框架</button>
         <button type="button" class="chip" data-brief-parse>智能整理粘贴内容</button>

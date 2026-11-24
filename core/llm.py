@@ -77,3 +77,24 @@ def stream_chat(messages: list[dict[str, str]], *, temperature: float | None = N
         if produced or finish != "length" or attempt == 1:
             return
         budget = 16384
+
+
+def transcribe(audio: bytes, filename: str = "audio.wav") -> str:
+    """语音转文字（智谱 GLM-ASR，OpenAI 兼容 /audio/transcriptions 接口）。"""
+    settings = get_settings()
+    api_key = settings.asr_api_key or settings.api_key
+    if not api_key:
+        raise LLMError("尚未配置语音识别密钥：请在 .env 中填写 ASR_API_KEY 或 LLM_API_KEY")
+    try:
+        from openai import OpenAI
+    except ImportError as exc:  # pragma: no cover
+        raise LLMError("缺少 openai 依赖，请执行 pip install -r requirements.txt") from exc
+    client = OpenAI(api_key=api_key, base_url=settings.asr_base_url, timeout=120.0, max_retries=1)
+    try:
+        resp = client.audio.transcriptions.create(
+            model=settings.asr_model,
+            file=(filename, audio),
+        )
+    except Exception as exc:  # noqa: BLE001 - 统一转成可读提示
+        raise LLMError(_friendly(exc)) from exc
+    return (getattr(resp, "text", "") or "").strip()

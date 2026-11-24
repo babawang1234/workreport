@@ -739,6 +739,158 @@
       });
     }
 
+    /* ---------- 语音输入：按住说话转文字 ---------- */
+    var voiceBtn = $("#voice-btn");
+    if (voiceBtn && briefEl) {
+      var voiceState = "idle";
+      var audioCtx = null;
+      var mediaStream = null;
+      var scriptNode = null;
+      var voiceChunks = [];
+      var voiceSampleRate = 44100;
+      var voiceTimer = null;
+      var MAX_REC_MS = 30000;
+
+      var setVoiceState = function (state) {
+        voiceState = state;
+        var label = voiceBtn.querySelector(".voice-label");
+        voiceBtn.classList.remove("recording", "uploading");
+        if (state === "recording") {
+          voiceBtn.classList.add("recording");
+          if (label) label.textContent = "松开结束";
+        } else if (state === "uploading") {
+          voiceBtn.classList.add("uploading");
+          if (label) label.textContent = "识别中…";
+        } else if (label) {
+          label.textContent = "按住说话";
+        }
+      };
+
+      var encodeWAV = function (chunks, sampleRate) {
+        var length = 0;
+        chunks.forEach(function (c) { length += c.length; });
+        var buffer = new Float32Array(length);
+        var offset = 0;
+        chunks.forEach(function (c) { buffer.set(c, offset); offset += c.length; });
+
+        var numChannels = 1;
+        var bytesPerSample = 2;
+        var blockAlign = numChannels * bytesPerSample;
+        var dataSize = buffer.length * bytesPerSample;
+        var arrayBuffer = new ArrayBuffer(44 + dataSize);
+        var view = new DataView(arrayBuffer);
+
+        var writeString = function (pos, str) {
+          for (var i = 0; i < str.length; i++) view.setUint8(pos + i, str.charCodeAt(i));
+        };
+
+        writeString(0, "RIFF");
+        view.setUint32(4, 36 + dataSize, true);
+        writeString(8, "WAVE");
+        writeString(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, 16, true);
+        writeString(36, "data");
+        view.setUint32(40, dataSize, true);
+
+        for (var i = 0; i < buffer.length; i++) {
+          var s = Math.max(-1, Math.min(1, buffer[i]));
+          view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        }
+        return new Blob([arrayBuffer], { type: "audio/wav" });
+      };
+
+      var uploadVoice = async function (blob) {
+        try {
+          var fd = new FormData();
+          fd.append("file", blob, "voice.wav");
+          var res = await fetch("/api/transcribe", { method: "POST", body: fd });
+          var data = {};
+          try { data = await res.json(); } catch (e) { /* 忽略 */ }
+          if (!res.ok) throw new Error(data.detail || "转写失败，请重试");
+          var text = (data.text || "").trim();
+          if (!text) throw new Error("没有识别到内容，请重新说一次");
+          var current = briefEl.value.trim();
+          briefEl.value = current ? current + "\n" + text : text;
+          briefEl.focus();
+          briefEl.dispatchEvent(new Event("input"));
+          var autoGen = $("#voice-auto");
+          if (autoGen && autoGen.checked) {
+            if (draftTip) draftTip.textContent = "已识别，正在自动生成…";
+            genForm.requestSubmit();
+          } else if (draftTip) {
+            draftTip.textContent = "已识别并填入输入框，点「一键生成汇报」完成转化";
+          }
+        } catch (err) {
+          if (draftTip) draftTip.textContent = err.message || "语音转写失败";
+        } finally {
+          setVoiceState("idle");
+        }
+      };
+
+      var stopVoice = function () {
+        if (voiceState !== "recording") return;
+        if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null; }
+        try { scriptNode.disconnect(); } catch (e) { /* 忽略 */ }
+        try { mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* 忽略 */ }
+        try { audioCtx.close(); } catch (e) { /* 忽略 */ }
+        var wav = encodeWAV(voiceChunks, voiceSampleRate);
+        voiceChunks = [];
+        setVoiceState("uploading");
+        uploadVoice(wav);
+      };
+
+      var startVoice = async function (ev) {
+        if (ev && ev.cancelable) ev.preventDefault();
+        if (voiceState !== "idle") return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          if (draftTip) draftTip.textContent = "当前浏览器不支持语音输入，请用手机浏览器打开";
+          return;
+        }
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          if (draftTip) draftTip.textContent = "无法访问麦克风，请在浏览器设置里允许麦克风权限";
+          return;
+        }
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) {
+          try { mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* 忽略 */ }
+          if (draftTip) draftTip.textContent = "当前浏览器不支持录音，请用手机浏览器打开";
+          return;
+        }
+        audioCtx = new AC();
+        if (audioCtx.state === "suspended") { try { await audioCtx.resume(); } catch (e) { /* 忽略 */ } }
+        var source = audioCtx.createMediaStreamSource(mediaStream);
+        scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+        voiceChunks = [];
+        voiceSampleRate = audioCtx.sampleRate || 44100;
+        scriptNode.onaudioprocess = function (e) {
+          var input = e.inputBuffer.getChannelData(0);
+          var copy = new Float32Array(input.length);
+          copy.set(input);
+          voiceChunks.push(copy);
+        };
+        source.connect(scriptNode);
+        scriptNode.connect(audioCtx.destination);
+        setVoiceState("recording");
+        voiceTimer = setTimeout(stopVoice, MAX_REC_MS);
+      };
+
+      voiceBtn.addEventListener("touchstart", startVoice, { passive: false });
+      voiceBtn.addEventListener("touchend", function (ev) { ev.preventDefault(); stopVoice(); }, { passive: false });
+      voiceBtn.addEventListener("touchcancel", stopVoice);
+      voiceBtn.addEventListener("mousedown", startVoice);
+      voiceBtn.addEventListener("mouseup", stopVoice);
+      voiceBtn.addEventListener("mouseleave", stopVoice);
+      voiceBtn.addEventListener("contextmenu", function (ev) { ev.preventDefault(); });
+    }
+
     var frameBtn = genForm.querySelector("[data-brief-frame]");
     if (frameBtn && briefEl) {
       var frameText = "本周完成：\n1. \n2. \n3. \n\n遇到的问题：\n1. \n\n下周计划：\n1. \n\n需要的支持：\n1. ";

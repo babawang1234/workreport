@@ -81,6 +81,9 @@ class Settings:
     epay_key: str
     alipay_qr: str
     wechat_qr: str
+    asr_api_key: str
+    asr_base_url: str
+    asr_model: str
 
 
 @lru_cache(maxsize=1)
@@ -107,6 +110,9 @@ def get_settings() -> Settings:
         epay_key=_secret("EPAY_KEY"),
         alipay_qr=_secret("ALIPAY_QR") or _default_qr(),
         wechat_qr=_secret("WECHAT_QR") or _default_wechat_qr(),
+        asr_api_key=_secret("ASR_API_KEY") or _secret("LLM_API_KEY"),
+        asr_base_url=_secret("ASR_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"),
+        asr_model=_secret("ASR_MODEL", "glm-asr-2512"),
     )
 
 
