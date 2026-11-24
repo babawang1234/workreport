@@ -2680,3 +2680,6 @@ textarea:hover { border-color: #C9CEDC; }
   .hero-aura { display: none; }
   .carousel#pricing .plan-card.featured { animation: none; }
 }
+
+/* 防止首屏装饰光晕导致移动端横向滚动 */
+html, body { overflow-x: clip; }
