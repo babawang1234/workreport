@@ -766,12 +766,34 @@
         }
       };
 
+      var resample = function (buffer, fromRate, toRate) {
+        var ratio = fromRate / toRate;
+        var newLength = Math.max(1, Math.round(buffer.length / ratio));
+        var out = new Float32Array(newLength);
+        for (var i = 0; i < newLength; i++) {
+          var src = i * ratio;
+          var idx = Math.floor(src);
+          var frac = src - idx;
+          var a = buffer[idx] || 0;
+          var b = buffer[idx + 1] || 0;
+          out[i] = a + (b - a) * frac;
+        }
+        return out;
+      };
+
       var encodeWAV = function (chunks, sampleRate) {
         var length = 0;
         chunks.forEach(function (c) { length += c.length; });
         var buffer = new Float32Array(length);
         var offset = 0;
         chunks.forEach(function (c) { buffer.set(c, offset); offset += c.length; });
+
+        // 重采样到 16kHz：语音识别标准采样率，体积缩小约 2/3，加快上传与返回
+        var TARGET_RATE = 16000;
+        if (sampleRate > TARGET_RATE) {
+          buffer = resample(buffer, sampleRate, TARGET_RATE);
+          sampleRate = TARGET_RATE;
+        }
 
         var numChannels = 1;
         var bytesPerSample = 2;
