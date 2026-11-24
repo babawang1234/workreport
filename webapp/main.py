@@ -51,7 +51,7 @@ MARKETING_DIR = ROOT_DIR / "docs"
 COOKIE_NAME = "k"
 VISITOR_COOKIE = "vid"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 60  # 60 天
-DEFAULT_LENGTH = "标准（约600-800字）"
+DEFAULT_LENGTH = "标准（约450-550字）"
 
 # 简单的单 IP 生成限流：防止清 cookie 刷免费试用把大模型额度刷爆
 _GEN_WINDOW = 3600

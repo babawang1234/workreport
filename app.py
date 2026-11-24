@@ -47,7 +47,7 @@ for key, value in {
     "report_type": "周报",
     "position": "产品经理",
     "audience": "直属上级",
-    "length_key": "标准（约600-800字）",
+    "length_key": "标准（约450-550字）",
     "brief": "",
     "extra": "",
     "refine_text": "",
