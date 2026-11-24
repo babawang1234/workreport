@@ -278,33 +278,14 @@ def robots_txt():
 
 @app.get("/sitemap.xml")
 def sitemap_xml():
-    base = (settings.site_url or "").rstrip("/")
-    today = datetime.now().strftime("%Y-%m-%d")
-    urls = [
-        ("/", "1.0"),
-        ("/gongzuo-zongjie.html", "1.0"),
-        ("/zhoubao-moban.html", "0.9"),
-        ("/zhoubao-fanwen.html", "0.9"),
-        ("/yuebao-fanwen.html", "0.9"),
-        ("/shuzhi-baogao.html", "0.9"),
-        ("/shixi-zhoubao-fanwen.html", "0.9"),
-        ("/jidu-zongjie.html", "0.8"),
-        ("/zhoubao-kaitou.html", "0.8"),
-        ("/ribao-fanwen.html", "0.8"),
-        ("/zongjie-kaitou-jiewei.html", "0.8"),
-        ("/activate", "0.8"),
-        ("/buy", "0.8"),
-        ("/guide", "0.6"),
-    ]
-    body = ['<?xml version="1.0" encoding="UTF-8"?>',
-            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for path, priority in urls:
-        body.append(
-            f"<url><loc>{base}{path}</loc><lastmod>{today}</lastmod>"
-            f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>"
-        )
-    body.append("</urlset>")
-    return Response("\n".join(body), media_type="application/xml")
+    path = MARKETING_DIR / "sitemap.xml"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="sitemap 不存在")
+    return FileResponse(
+        path,
+        media_type="application/xml",
+        headers={"Cache-Control": "no-cache, max-age=0, must-revalidate"},
+    )
 
 
 @app.get("/guide", response_class=HTMLResponse)
