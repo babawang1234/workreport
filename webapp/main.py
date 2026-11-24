@@ -928,4 +928,8 @@ def marketing_page(full_path: str):
     page = _marketing_file(full_path)
     if page is None:
         raise HTTPException(status_code=404, detail="页面不存在")
-    return FileResponse(page)
+    headers = None
+    if page.suffix in (".html", ".xml", ".txt"):
+        # 页面与站点地图不缓存，避免 CDN 拿到旧版本
+        headers = {"Cache-Control": "no-cache, max-age=0, must-revalidate"}
+    return FileResponse(page, headers=headers)
