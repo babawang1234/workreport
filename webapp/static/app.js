@@ -855,8 +855,37 @@
         }
       };
 
+      var playBeep = function () {
+        try {
+          var AC2 = window.AudioContext || window.webkitAudioContext;
+          if (!AC2) return;
+          var c = new AC2();
+          var osc = c.createOscillator();
+          var gain = c.createGain();
+          osc.type = "sine";
+          osc.frequency.value = 1000;
+          var t = c.currentTime;
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.exponentialRampToValueAtTime(0.35, t + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+          osc.connect(gain);
+          gain.connect(c.destination);
+          osc.start(t);
+          osc.stop(t + 0.15);
+          osc.onended = function () { try { c.close(); } catch (e) { /* 忽略 */ } };
+        } catch (e) { /* 忽略 */ }
+      };
+
+      var vibrate = function (pattern) {
+        try {
+          if (navigator.vibrate) navigator.vibrate(pattern);
+        } catch (e) { /* 忽略 */ }
+      };
+
       var stopVoice = function () {
         if (voiceState !== "recording") return;
+        playBeep();
+        vibrate(20);
         if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null; }
         try { scriptNode.disconnect(); } catch (e) { /* 忽略 */ }
         try { mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { /* 忽略 */ }
@@ -901,6 +930,8 @@
         source.connect(scriptNode);
         scriptNode.connect(audioCtx.destination);
         setVoiceState("recording");
+        playBeep();
+        vibrate(30);
         voiceTimer = setTimeout(stopVoice, MAX_REC_MS);
       };
 
