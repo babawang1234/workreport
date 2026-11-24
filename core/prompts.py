@@ -208,8 +208,8 @@ def build_generation_prompt(
         user += f"\n额外要求（优先级最高）：{extra.strip()}\n"
 
     user += (
-        f"\n正文（不含标题）不少于 {int(target_words * 0.9)} 字；每个模块 3-5 条，每条 40 字以上，写清做了什么、带来什么变化；"
-        "只使用我提供的信息、不得编造任何数据，缺数据用【待补充：xx】。"
+        f"\n正文（不含标题）不少于 {int(target_words * 0.9)} 字，四个模块每块正文不少于 {int(target_words * 0.9 / 4)} 字；每个模块 3-5 条，每条 45 字以上，写清做了什么、带来什么变化、接下来怎么推进；"
+        "只使用我提供的信息、不得编造任何数据，缺数据用【待补充：xx】。输出前自检字数，不足则把已提及事项的做法与影响写细，不要用空话凑数。"
     )
     user += "\n请直接输出可以提交的汇报正文。"
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
