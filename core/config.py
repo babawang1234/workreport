@@ -68,6 +68,7 @@ class Settings:
     max_tokens: int
     admin_user: str
     admin_password: str
+    test_code: str
     db_path: Path
     database_url: str
     max_input_chars: int
@@ -100,6 +101,7 @@ def get_settings() -> Settings:
         max_tokens=int(_secret("LLM_MAX_TOKENS", "2400") or 2400),
         admin_user=_secret("ADMIN_USER", "admin"),
         admin_password=_secret("ADMIN_PASSWORD", "admin888"),
+        test_code=_secret("TEST_CODE", "ADMIN-ZB2026"),
         db_path=DATA_DIR / "app.db",
         database_url=_secret("DATABASE_URL"),
         max_input_chars=int(_secret("MAX_INPUT_CHARS", "8000") or 8000),

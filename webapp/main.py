@@ -127,12 +127,16 @@ def _session(request: Request) -> tuple[dict | None, str | None]:
 def _page_auth(request: Request) -> tuple[dict | None, str | None, RedirectResponse | None]:
     info, token = _session(request)
     if not info:
+        info, token = _admin_owner(request)
+    if not info:
         return None, None, RedirectResponse("/activate", status_code=303)
     return info, token, None
 
 
 def _api_auth(request: Request) -> tuple[dict, str]:
     info, token = _session(request)
+    if not info:
+        info, token = _admin_owner(request)
     if not info or not token:
         raise HTTPException(status_code=401, detail="登录状态已失效，请重新激活兑换码")
     return info, token
@@ -232,6 +236,21 @@ def _admin_authed(request: Request) -> bool:
     except ValueError:
         return False
     return time.time() - issued <= ADMIN_MAX_AGE
+
+
+def _admin_owner(request: Request) -> tuple[dict | None, str | None]:
+    """管理员登录后台后，自动映射到固定测试账号，不限次数、报告可正常保存与查看。"""
+    if not _admin_authed(request) or not settings.test_code:
+        return None, None
+    parts = (request.cookies.get(ADMIN_COOKIE) or "").split("|")
+    token = "adm_" + _admin_sig(settings.admin_user, parts[1])[:24]
+    info = store.session_info(token)
+    if not info:
+        result = store.activate(settings.test_code, token)
+        if not result.ok:
+            return None, None
+        info = store.session_info(token)
+    return info, token
 
 
 def _orders_snapshot(limit: int = 80) -> tuple[list[dict], dict]:
@@ -366,6 +385,8 @@ def logout():
 @app.get("/write", response_class=HTMLResponse)
 def write_page(request: Request):
     info, _token = _session(request)
+    if not info:
+        info, _token = _admin_owner(request)
     trial_left = store.trial_left(_visitor(request), settings.trial_uses)
     if not info and trial_left <= 0:
         return RedirectResponse("/activate", status_code=303)
@@ -387,7 +408,6 @@ def write_page(request: Request):
     )
 
 
-@app.post("/api/generate")
 def _import_rate_limit(request: Request) -> None:
     """素材导入按 IP 限流：试用用户也能用，但防止匿名刷解析/视觉额度。"""
     ip = (request.headers.get("x-real-ip") or (request.client.host if request.client else "")).strip() or "anonymous"
@@ -399,8 +419,11 @@ def _import_rate_limit(request: Request) -> None:
     _IMPORT_HITS[ip] = hits
 
 
+@app.post("/api/generate")
 async def api_generate(request: Request):
     info, token = _session(request)
+    if not info:
+        info, token = _admin_owner(request)
     trial_mode = not info
     visitor = _visitor(request)
 
