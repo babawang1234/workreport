@@ -84,6 +84,9 @@ class Settings:
     asr_api_key: str
     asr_base_url: str
     asr_model: str
+    vision_api_key: str
+    vision_base_url: str
+    vision_model: str
 
 
 @lru_cache(maxsize=1)
@@ -113,6 +116,9 @@ def get_settings() -> Settings:
         asr_api_key=_secret("ASR_API_KEY") or _secret("LLM_API_KEY"),
         asr_base_url=_secret("ASR_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"),
         asr_model=_secret("ASR_MODEL", "glm-asr-2512"),
+        vision_api_key=_secret("VISION_API_KEY") or _secret("ASR_API_KEY") or _secret("LLM_API_KEY"),
+        vision_base_url=_secret("VISION_BASE_URL", "https://open.bigmodel.cn/api/paas/v4"),
+        vision_model=_secret("VISION_MODEL", "glm-4v-flash"),
     )
 
 

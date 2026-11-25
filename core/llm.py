@@ -79,6 +79,49 @@ def stream_chat(messages: list[dict[str, str]], *, temperature: float | None = N
         budget = 16384
 
 
+def vision_text(image: bytes, mime: str = "image/png") -> str:
+    """截图文字提取（智谱 GLM-4V，免费额度内可用）。"""
+    import base64
+
+    settings = get_settings()
+    api_key = settings.vision_api_key
+    if not api_key:
+        raise LLMError("尚未配置视觉模型密钥：请在 .env 中填写 VISION_API_KEY 或 LLM_API_KEY")
+    try:
+        from openai import OpenAI
+    except ImportError as exc:  # pragma: no cover
+        raise LLMError("缺少 openai 依赖，请执行 pip install -r requirements.txt") from exc
+
+    data_url = f"data:{mime};base64,{base64.b64encode(image).decode()}"
+    client = OpenAI(api_key=api_key, base_url=settings.vision_base_url, timeout=120.0, max_retries=1)
+    try:
+        resp = client.chat.completions.create(
+            model=settings.vision_model,
+            temperature=0.1,
+            max_tokens=2000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "请把这张图片里的所有文字完整提取出来，保留原有的层级和列表结构，"
+                                "按从上到下的顺序输出纯文本。不要总结、不要翻译、不要补充图片里没有的内容。"
+                                "如果图片里没有文字，只回复「无文字」。"
+                            ),
+                        },
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                }
+            ],
+        )
+    except Exception as exc:  # noqa: BLE001 - 统一转成可读提示
+        raise LLMError(_friendly(exc)) from exc
+    text = (resp.choices[0].message.content or "").strip()
+    return "" if text == "无文字" else text
+
+
 def transcribe(audio: bytes, filename: str = "audio.wav") -> str:
     """语音转文字（智谱 GLM-ASR，OpenAI 兼容 /audio/transcriptions 接口）。"""
     settings = get_settings()

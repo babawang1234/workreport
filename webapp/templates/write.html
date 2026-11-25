@@ -87,6 +87,24 @@
         </div>
       </details>
 
+      <details class="inbox" id="import-box">
+        <summary><span>导入素材：Word / Excel / PPT / PDF / 截图 / 链接</span><b>自动提炼</b></summary>
+        <div class="inbox-body">
+          <div class="extract-row">
+            <label class="btn ghost sm extract-pick">
+              <input type="file" id="extract-file" accept=".docx,.xlsx,.pptx,.pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp">
+              <span>选择文件</span>
+            </label>
+            <span class="muted small">上传后自动提炼文字并追加到上方输入框，单个文件不超过 10MB</span>
+          </div>
+          <div class="inline-form">
+            <input type="url" id="extract-url" placeholder="粘贴网页链接，自动抓取正文">
+            <button type="button" class="btn sm" id="extract-url-btn">读取链接</button>
+          </div>
+          <p class="muted small extract-status" id="extract-status"></p>
+        </div>
+      </details>
+
       <div class="grid-2">
         <label class="field">
           <span>岗位</span>

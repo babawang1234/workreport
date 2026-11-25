@@ -739,6 +739,86 @@
       });
     }
 
+    /* ---------- 导入素材：文档 / 截图 / 网页链接 ---------- */
+    var extractFile = $("#extract-file");
+    var extractUrl = $("#extract-url");
+    var extractUrlBtn = $("#extract-url-btn");
+    var extractStatus = $("#extract-status");
+
+    var setExtractStatus = function (msg, bad) {
+      if (!extractStatus) return;
+      extractStatus.textContent = msg || "";
+      extractStatus.classList.toggle("err", !!bad);
+    };
+
+    var appendBrief = function (text, label) {
+      var piece = (text || "").trim();
+      if (!briefEl) return;
+      if (!piece) {
+        setExtractStatus("没有提取到文字内容，请换一份再试", true);
+        return;
+      }
+      var cur = (briefEl.value || "").trim();
+      briefEl.value = cur ? cur + "\n\n" + piece : piece;
+      briefEl.dispatchEvent(new Event("input"));
+      setExtractStatus("已导入" + (label || "素材") + "，共 " + piece.length + " 字");
+    };
+
+    if (extractFile && briefEl) {
+      extractFile.addEventListener("change", async function () {
+        var file = extractFile.files && extractFile.files[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+          setExtractStatus("文件超过 10MB，请压缩或截取关键部分后再上传", true);
+          extractFile.value = "";
+          return;
+        }
+        setExtractStatus("正在解析「" + file.name + "」…");
+        var fd = new FormData();
+        fd.append("file", file);
+        try {
+          var res = await fetch("/api/extract", { method: "POST", body: fd });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok) throw new Error(data.detail || "解析失败（" + res.status + "）");
+          appendBrief(data.text, "文件");
+        } catch (err) {
+          setExtractStatus(err.message || "解析失败，请稍后重试", true);
+        } finally {
+          extractFile.value = "";
+        }
+      });
+    }
+
+    var pullLink = async function () {
+      if (!extractUrl || !briefEl) return;
+      var url = (extractUrl.value || "").trim();
+      if (!url) {
+        setExtractStatus("请先粘贴网页链接", true);
+        return;
+      }
+      if (extractUrlBtn) extractUrlBtn.disabled = true;
+      setExtractStatus("正在读取网页正文…");
+      try {
+        var res = await apiPost("/api/extract-url", { url: url });
+        var data = await res.json();
+        appendBrief(data.text, "链接正文");
+        extractUrl.value = "";
+      } catch (err) {
+        setExtractStatus(err.message || "读取失败，请稍后重试", true);
+      } finally {
+        if (extractUrlBtn) extractUrlBtn.disabled = false;
+      }
+    };
+    if (extractUrlBtn) extractUrlBtn.addEventListener("click", pullLink);
+    if (extractUrl) {
+      extractUrl.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          pullLink();
+        }
+      });
+    }
+
     /* ---------- 语音输入：按住说话转文字 ---------- */
     var voiceBtn = $("#voice-btn");
     if (voiceBtn && briefEl) {

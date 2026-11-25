@@ -29,7 +29,9 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
+from core import extract as extractor
 from core import llm, payments, store
 from core.config import ROOT_DIR, get_settings
 from core.db import connection
@@ -540,6 +542,34 @@ async def api_transcribe(request: Request, file: UploadFile = File(...)):
     if not text:
         raise HTTPException(status_code=400, detail="没有识别到内容，请重新说一次")
     return {"text": text}
+
+
+@app.post("/api/extract")
+async def api_extract(request: Request, file: UploadFile = File(...)):
+    """上传 Word/Excel/PPT/PDF/图片/文本，返回提炼后的纯文本。"""
+    _api_auth(request)
+    raw = await file.read()
+    try:
+        text = await run_in_threadpool(extractor.extract_file, raw, file.filename or "")
+    except extractor.ExtractError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"text": text, "chars": len(text), "filename": file.filename or ""}
+
+
+@app.post("/api/extract-url")
+async def api_extract_url(request: Request):
+    """抓取网页链接正文，返回纯文本。"""
+    _api_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="请求格式错误")
+    url = str(body.get("url") or "").strip()
+    try:
+        text = await run_in_threadpool(extractor.extract_link, url)
+    except extractor.ExtractError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"text": text, "chars": len(text)}
 
 
 @app.post("/api/aggregate")

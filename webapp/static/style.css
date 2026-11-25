@@ -2022,6 +2022,14 @@ select {
 .inbox-body { padding: 10px 0 12px; }
 .inbox-body .inline-form { margin-top: 0; }
 
+/* 导入素材：文件 / 链接 */
+.extract-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.extract-pick { cursor: pointer; }
+.extract-pick input[type="file"] { display: none; }
+.extract-status { margin: 8px 0 0; }
+.extract-status:empty { display: none; }
+.extract-status.err { color: #DC2626; }
+
 .inbox-list {
   display: flex;
   flex-direction: column;
