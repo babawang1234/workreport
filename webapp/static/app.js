@@ -1973,3 +1973,70 @@
     btn.disabled = false;
   });
 })();
+
+/* ---------------- 报告详情：推送到群 ---------------- */
+(function () {
+  "use strict";
+
+  var form = document.getElementById("push-form");
+  if (!form) return;
+
+  var btn = document.getElementById("push-btn");
+  var status = document.getElementById("push-status");
+  var channelSel = form.querySelector('[name="channel"]');
+  var webhookInput = form.querySelector('[name="webhook"]');
+  var secretInput = form.querySelector('[name="secret"]');
+
+  var storageKey = function () {
+    return "zhibao.push." + (channelSel ? channelSel.value : "feishu");
+  };
+  var setStatus = function (msg, ok, bad) {
+    if (!status) return;
+    status.className = "status" + (ok ? " ok" : bad ? " err" : "");
+    status.textContent = msg || "";
+  };
+  var loadWebhook = function () {
+    try {
+      var saved = localStorage.getItem(storageKey());
+      if (saved) webhookInput.value = saved;
+      else webhookInput.value = "";
+    } catch (e) { /* 隐私模式忽略 */ }
+  };
+
+  if (channelSel) {
+    channelSel.addEventListener("change", loadWebhook);
+    loadWebhook();
+  }
+
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var webhook = (webhookInput.value || "").trim();
+    if (!webhook) {
+      setStatus("请先粘贴群机器人 Webhook 地址", false, true);
+      webhookInput.focus();
+      return;
+    }
+    btn.disabled = true;
+    setStatus("正在发送…");
+    try {
+      var res = await fetch("/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          report_id: form.getAttribute("data-report-id"),
+          channel: channelSel ? channelSel.value : "feishu",
+          webhook: webhook,
+          secret: secretInput ? (secretInput.value || "").trim() : ""
+        })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.detail || "发送失败（" + res.status + "）");
+      try { localStorage.setItem(storageKey(), webhook); } catch (e) { /* 忽略 */ }
+      setStatus("已发送到" + (data.channel_label || "群") + "，去群里看看", true, false);
+    } catch (err) {
+      setStatus(err.message || "发送失败，请检查 Webhook 是否正确", false, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();

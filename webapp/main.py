@@ -32,7 +32,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from core import extract as extractor
-from core import llm, payments, store
+from core import llm, payments, push, store
 from core.config import ROOT_DIR, get_settings
 from core.db import connection
 from core.exporter import ensure_title, md_to_docx
@@ -658,6 +658,35 @@ async def api_summarize(request: Request):
         "limit": limit,
         "summary_error": err,
     }
+
+
+@app.post("/api/push")
+async def api_push(request: Request):
+    """把报告推送到飞书 / 钉钉 / 企业微信群机器人。"""
+    info, _token = _api_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="请求格式错误")
+    try:
+        report_id = int(body.get("report_id") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="报告编号不正确")
+    record = store.get_report(report_id, info["code"])
+    if not record:
+        raise HTTPException(status_code=404, detail="报告不存在或已删除")
+    try:
+        label = await run_in_threadpool(
+            push.push,
+            str(body.get("channel") or ""),
+            str(body.get("webhook") or ""),
+            record.get("title") or "工作汇报",
+            record.get("content") or "",
+            str(body.get("secret") or ""),
+        )
+    except push.PushError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": True, "channel": body.get("channel"), "channel_label": label}
 
 
 @app.post("/api/aggregate")
