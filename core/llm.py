@@ -98,7 +98,7 @@ def vision_text(image: bytes, mime: str = "image/png") -> str:
         resp = client.chat.completions.create(
             model=settings.vision_model,
             temperature=0.1,
-            max_tokens=2000,
+            max_tokens=1024,
             messages=[
                 {
                     "role": "user",

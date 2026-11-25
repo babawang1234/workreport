@@ -125,34 +125,79 @@ def extract_html_text(raw: str) -> str:
     return _clip(text)
 
 
+def _ssl_context():
+    """优先用 certifi 根证书，兼容部分缺少系统证书的环境。"""
+    try:
+        import ssl
+
+        import certifi  # type: ignore
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return None
+
+
+def _fetch_html(url: str) -> tuple[str, str]:
+    """用标准库抓取网页，返回 (正文, content-type)。"""
+    import gzip
+    import zlib
+    from urllib.error import HTTPError, URLError
+    from urllib.request import Request, urlopen
+
+    req = Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+            ),
+            "Accept-Language": "zh-CN,zh;q=0.9",
+        },
+    )
+    try:
+        with urlopen(req, timeout=15, context=_ssl_context()) as resp:
+            ctype = (resp.headers.get("content-type") or "").lower()
+            encoding = (resp.headers.get("content-encoding") or "").lower()
+            raw = resp.read(4 * 1024 * 1024)
+    except HTTPError as exc:
+        raise ExtractError(f"这个链接返回 {exc.code}，无法读取内容") from exc
+    except (URLError, OSError) as exc:
+        raise ExtractError("打开这个链接失败，请确认地址可公开访问") from exc
+
+    if "gzip" in encoding:
+        try:
+            raw = gzip.decompress(raw)
+        except OSError:
+            pass
+    elif "deflate" in encoding:
+        try:
+            raw = zlib.decompress(raw)
+        except zlib.error:
+            pass
+
+    charset = ""
+    m = re.search(r"charset=([\w-]+)", ctype)
+    if m:
+        charset = m.group(1)
+    if charset:
+        return raw.decode(charset, errors="ignore"), ctype
+    try:
+        return raw.decode("utf-8"), ctype
+    except UnicodeDecodeError:
+        return raw.decode("gb18030", errors="ignore"), ctype
+
+
 def extract_link(url: str) -> str:
     url = (url or "").strip()
     if not re.match(r"^https?://", url, re.I):
         raise ExtractError("请填写以 http:// 或 https:// 开头的完整网址")
-    try:
-        import httpx
-    except ImportError as exc:
-        raise ExtractError("服务端缺少网页抓取依赖") from exc
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/125.0 Safari/537.36"
-        ),
-        "Accept-Language": "zh-CN,zh;q=0.9",
-    }
-    try:
-        resp = httpx.get(url, headers=headers, timeout=15.0, follow_redirects=True)
-    except Exception as exc:
-        raise ExtractError("打开这个链接失败，请确认地址可公开访问") from exc
-    if resp.status_code >= 400:
-        raise ExtractError(f"这个链接返回 {resp.status_code}，无法读取内容")
-    ctype = (resp.headers.get("content-type") or "").lower()
+    body, ctype = _fetch_html(url)
     if not any(k in ctype for k in ("html", "text", "json")):
         raise ExtractError("这个链接不是网页内容，请下载后作为文件上传")
     if "html" in ctype:
-        text = extract_html_text(resp.text)
+        text = extract_html_text(body)
     else:
-        text = _clip(resp.text)
+        text = _clip(body)
     if len(text) < 40:
         raise ExtractError("这个页面几乎读不到正文，可能由脚本动态渲染，请改用截图上传")
     return text
