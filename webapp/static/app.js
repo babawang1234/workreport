@@ -783,6 +783,37 @@
       }
     };
 
+    /* ---------- 大图自动压缩，避免上传失败 ---------- */
+    var compressImage = function (file) {
+      if (!file.type || file.type.indexOf("image/") !== 0) return Promise.resolve(file);
+      if (file.size < 1.5 * 1024 * 1024) return Promise.resolve(file);
+      return new Promise(function (resolve) {
+        var img = new Image();
+        var url = URL.createObjectURL(file);
+        var done = function (out) {
+          URL.revokeObjectURL(url);
+          resolve(out || file);
+        };
+        img.onload = function () {
+          var max = 1800;
+          var scale = Math.min(1, max / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round((img.naturalWidth || 1) * scale));
+          canvas.height = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(function (blob) {
+            if (!blob || blob.size >= file.size) {
+              done(file);
+              return;
+            }
+            done(new File([blob], (file.name || "image").replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" }));
+          }, "image/jpeg", 0.85);
+        };
+        img.onerror = function () { done(file); };
+        img.src = url;
+      });
+    };
+
     /* ---------- 预览确认 ---------- */
     var previewBox = $("#extract-preview");
     var previewHead = $("#extract-preview-head");
@@ -875,15 +906,15 @@
 
     if (extractFile && briefEl) {
       extractFile.addEventListener("change", async function () {
-        var file = extractFile.files && extractFile.files[0];
-        if (!file) return;
-        if (file.size > 10 * 1024 * 1024) {
-          setExtractStatus("文件超过 10MB，请压缩或截取关键部分后再上传", true);
-          extractFile.value = "";
-          return;
-        }
+        var picked = extractFile.files && extractFile.files[0];
+        if (!picked) return;
         var opts = extractOptions();
         hidePreview();
+        var file = picked;
+        if (picked.type && picked.type.indexOf("image/") === 0 && picked.size > 1.5 * 1024 * 1024) {
+          setExtractStatus("图片较大，正在自动压缩…");
+          file = await compressImage(picked);
+        }
         setExtractStatus(opts.limit ? "正在解析并提炼「" + file.name + "」…" : "正在解析「" + file.name + "」…");
         var fd = new FormData();
         fd.append("file", file);

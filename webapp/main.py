@@ -62,6 +62,9 @@ DEFAULT_LENGTH = "标准（约450-550字）"
 _GEN_WINDOW = 3600
 _GEN_LIMIT = 30
 _GEN_HITS: dict[str, list[float]] = {}
+_IMPORT_WINDOW = 600
+_IMPORT_LIMIT = 40
+_IMPORT_HITS: dict[str, list[float]] = {}
 
 # 语音转写单 IP 限流：防止刷转写接口烧 ASR 额度
 _ASR_WINDOW = 3600
@@ -384,6 +387,17 @@ def write_page(request: Request):
 
 
 @app.post("/api/generate")
+def _import_rate_limit(request: Request) -> None:
+    """素材导入按 IP 限流：试用用户也能用，但防止匿名刷解析/视觉额度。"""
+    ip = (request.headers.get("x-real-ip") or (request.client.host if request.client else "")).strip() or "anonymous"
+    now_ts = time.time()
+    hits = [t for t in _IMPORT_HITS.get(ip, []) if now_ts - t < _IMPORT_WINDOW]
+    if len(hits) >= _IMPORT_LIMIT:
+        raise HTTPException(status_code=429, detail="导入太频繁，请稍后再试")
+    hits.append(now_ts)
+    _IMPORT_HITS[ip] = hits
+
+
 async def api_generate(request: Request):
     info, token = _session(request)
     trial_mode = not info
@@ -587,7 +601,7 @@ async def api_extract(
     report_type: str = Form("周报"),
 ):
     """上传 Word/Excel/PPT/PDF/图片/文本，提炼后返回纯文本。"""
-    _api_auth(request)
+    _import_rate_limit(request)
     raw = await file.read()
     try:
         text = await run_in_threadpool(extractor.extract_file, raw, file.filename or "")
@@ -609,7 +623,7 @@ async def api_extract(
 @app.post("/api/extract-url")
 async def api_extract_url(request: Request):
     """抓取网页链接正文，提炼后返回纯文本。"""
-    _api_auth(request)
+    _import_rate_limit(request)
     try:
         body = await request.json()
     except Exception:
@@ -637,7 +651,7 @@ async def api_extract_url(request: Request):
 @app.post("/api/summarize")
 async def api_summarize(request: Request):
     """对已解析的素材重新提炼，供预览时更换字数重试。"""
-    _api_auth(request)
+    _import_rate_limit(request)
     try:
         body = await request.json()
     except Exception:

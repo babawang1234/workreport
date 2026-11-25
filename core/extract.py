@@ -7,7 +7,8 @@ import io
 import re
 
 MAX_CHARS = 6000
-MAX_BYTES = 10 * 1024 * 1024
+MAX_BYTES = 40 * 1024 * 1024
+MAX_MB = MAX_BYTES // (1024 * 1024)
 
 
 class ExtractError(RuntimeError):
@@ -227,7 +228,7 @@ def extract_file(data: bytes, filename: str) -> str:
     if not data:
         raise ExtractError("文件是空的")
     if len(data) > MAX_BYTES:
-        raise ExtractError("文件超过 10MB，请压缩或截取关键部分后再上传")
+        raise ExtractError(f"文件超过 {MAX_MB}MB，请压缩或截取关键部分后再上传")
     name = (filename or "").lower()
     ext = name[name.rfind("."):] if "." in name else ""
     if ext in SUPPORTED:
