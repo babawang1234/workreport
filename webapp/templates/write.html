@@ -114,6 +114,15 @@
             <button type="button" class="btn sm" id="extract-url-btn">读取链接</button>
           </div>
           <p class="muted small extract-status" id="extract-status"></p>
+          <div class="extract-preview hidden" id="extract-preview">
+            <p class="extract-preview-head" id="extract-preview-head"></p>
+            <textarea id="extract-preview-text" rows="6" placeholder="提炼结果会显示在这里"></textarea>
+            <div class="extract-preview-actions">
+              <button type="button" class="btn primary sm" id="extract-preview-apply">采用并填入</button>
+              <button type="button" class="btn ghost sm" id="extract-preview-retry">按当前字数重试</button>
+              <button type="button" class="btn ghost sm" id="extract-preview-cancel">取消</button>
+            </div>
+          </div>
         </div>
       </details>
 

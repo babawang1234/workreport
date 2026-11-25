@@ -2032,6 +2032,26 @@ select {
 .extract-status:empty { display: none; }
 .extract-status.err { color: #DC2626; }
 
+/* 导入素材：预览确认 */
+.extract-preview {
+  margin-top: 10px;
+  padding: 10px 12px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: rgba(99, 102, 241, .03);
+}
+.extract-preview-head { margin: 0 0 8px; font-size: 12.5px; color: var(--ink); }
+.extract-preview textarea {
+  width: 100%;
+  min-height: 130px;
+  max-height: 260px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+}
+.extract-preview-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
 .inbox-list {
   display: flex;
   flex-direction: column;

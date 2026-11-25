@@ -596,6 +596,7 @@ async def api_extract(
     final, summarized, err = await run_in_threadpool(_summarize_material, text, limit, position, report_type)
     return {
         "text": final,
+        "raw_text": text,
         "chars": len(final),
         "raw_chars": len(text),
         "summarized": summarized,
@@ -624,6 +625,33 @@ async def api_extract_url(request: Request):
     final, summarized, err = await run_in_threadpool(_summarize_material, text, limit, position, report_type)
     return {
         "text": final,
+        "raw_text": text,
+        "chars": len(final),
+        "raw_chars": len(text),
+        "summarized": summarized,
+        "limit": limit,
+        "summary_error": err,
+    }
+
+
+@app.post("/api/summarize")
+async def api_summarize(request: Request):
+    """对已解析的素材重新提炼，供预览时更换字数重试。"""
+    _api_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="请求格式错误")
+    text = str(body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="素材内容为空，请重新导入")
+    limit = int(body.get("limit") or 0)
+    position = str(body.get("position") or "")
+    report_type = str(body.get("report_type") or "周报")
+    final, summarized, err = await run_in_threadpool(_summarize_material, text, limit, position, report_type)
+    return {
+        "text": final,
+        "raw_text": text,
         "chars": len(final),
         "raw_chars": len(text),
         "summarized": summarized,

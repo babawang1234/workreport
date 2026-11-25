@@ -783,6 +783,96 @@
       }
     };
 
+    /* ---------- 预览确认 ---------- */
+    var previewBox = $("#extract-preview");
+    var previewHead = $("#extract-preview-head");
+    var previewText = $("#extract-preview-text");
+    var previewApply = $("#extract-preview-apply");
+    var previewRetry = $("#extract-preview-retry");
+    var previewCancel = $("#extract-preview-cancel");
+    var pending = null;
+
+    var hidePreview = function () {
+      if (previewBox) previewBox.classList.add("hidden");
+      pending = null;
+    };
+
+    var previewSummary = function (data) {
+      if (data.summary_error) {
+        return "提炼失败，以下是原文（" + data.chars + " 字）：" + data.summary_error;
+      }
+      if (data.summarized) {
+        return "提炼完成：原文 " + data.raw_chars + " 字 → " + data.chars + " 字（目标 " + data.limit + " 字），确认后填入输入框";
+      }
+      if (data.limit) {
+        return "原文 " + data.chars + " 字，未超过 " + data.limit + " 字上限，未做精简";
+      }
+      return "原文 " + data.chars + " 字（不提炼），确认后填入输入框";
+    };
+
+    var showPreview = function (data, label) {
+      if (!previewBox || !previewText) {
+        appendBrief(data.text, label, data);
+        return;
+      }
+      pending = { raw: data.raw_text || data.text || "", label: label || "素材" };
+      if (previewHead) previewHead.textContent = previewSummary(data);
+      previewText.value = data.text || "";
+      previewBox.classList.remove("hidden");
+      setExtractStatus("");
+    };
+
+    if (previewApply) {
+      previewApply.addEventListener("click", function () {
+        if (!pending) return;
+        var text = (previewText.value || "").trim();
+        if (!text) {
+          setExtractStatus("预览内容为空，请重新导入", true);
+          return;
+        }
+        var cur = (briefEl.value || "").trim();
+        briefEl.value = cur ? cur + "\n\n" + text : text;
+        briefEl.dispatchEvent(new Event("input"));
+        setExtractStatus("已填入" + pending.label + "，共 " + text.length + " 字");
+        hidePreview();
+      });
+    }
+
+    if (previewCancel) {
+      previewCancel.addEventListener("click", function () {
+        hidePreview();
+        setExtractStatus("已取消导入");
+      });
+    }
+
+    if (previewRetry) {
+      previewRetry.addEventListener("click", async function () {
+        if (!pending) return;
+        var opts = extractOptions();
+        if (!opts.limit) {
+          setExtractStatus("当前选择是不提炼，上方即为原文", true);
+          return;
+        }
+        previewRetry.disabled = true;
+        setExtractStatus("正在按 " + opts.limit + " 字重新提炼…");
+        try {
+          var res = await apiPost("/api/summarize", {
+            text: pending.raw,
+            limit: opts.limit,
+            position: opts.position,
+            report_type: opts.report_type
+          });
+          var data = await res.json();
+          showPreview(data, pending.label);
+          if (data.summary_error) setExtractStatus(data.summary_error, true);
+        } catch (err) {
+          setExtractStatus(err.message || "重新提炼失败，请稍后重试", true);
+        } finally {
+          previewRetry.disabled = false;
+        }
+      });
+    }
+
     if (extractFile && briefEl) {
       extractFile.addEventListener("change", async function () {
         var file = extractFile.files && extractFile.files[0];
@@ -793,6 +883,7 @@
           return;
         }
         var opts = extractOptions();
+        hidePreview();
         setExtractStatus(opts.limit ? "正在解析并提炼「" + file.name + "」…" : "正在解析「" + file.name + "」…");
         var fd = new FormData();
         fd.append("file", file);
@@ -803,7 +894,7 @@
           var res = await fetch("/api/extract", { method: "POST", body: fd });
           var data = await res.json().catch(function () { return {}; });
           if (!res.ok) throw new Error(data.detail || "解析失败（" + res.status + "）");
-          appendBrief(data.text, "文件", data);
+          showPreview(data, "文件");
         } catch (err) {
           setExtractStatus(err.message || "解析失败，请稍后重试", true);
         } finally {
@@ -821,6 +912,7 @@
       }
       if (extractUrlBtn) extractUrlBtn.disabled = true;
       var opts = extractOptions();
+      hidePreview();
       setExtractStatus(opts.limit ? "正在读取网页并提炼正文…" : "正在读取网页正文…");
       try {
         var res = await apiPost("/api/extract-url", {
@@ -830,7 +922,7 @@
           report_type: opts.report_type
         });
         var data = await res.json();
-        appendBrief(data.text, "链接正文", data);
+        showPreview(data, "链接正文");
         extractUrl.value = "";
       } catch (err) {
         setExtractStatus(err.message || "读取失败，请稍后重试", true);
