@@ -1506,8 +1506,8 @@
       var parts = [];
       ["done", "risk", "plan", "help"].forEach(function (key) {
         if (!buckets[key].length) return;
-        parts.push(titles[key] + "：\n" + buckets[key].map(function (item, idx) {
-          return (idx + 1) + ". " + item;
+        parts.push(titles[key] + "：\n" + buckets[key].map(function (item) {
+          return "- " + item;
         }).join("\n"));
       });
       return parts.join("\n\n");
@@ -1515,18 +1515,35 @@
 
     var parseBtn = genForm.querySelector("[data-brief-parse]");
     if (parseBtn && briefEl) {
-      parseBtn.addEventListener("click", function () {
+      parseBtn.addEventListener("click", async function () {
         var raw = briefEl.value.trim();
         if (!raw) {
           if (draftTip) draftTip.textContent = "先把聊天记录或待办粘贴进来。";
           return;
         }
-        var organized = organizeBrief(raw);
-        if (!organized) return;
-        briefEl.value = organized;
-        briefEl.focus();
-        briefEl.dispatchEvent(new Event("input"));
-        if (draftTip) draftTip.textContent = "已按完成 / 问题 / 计划 / 支持四段整理。";
+        if (parseBtn.disabled) return;
+        var oldLabel = parseBtn.textContent;
+        parseBtn.disabled = true;
+        parseBtn.textContent = "整理中…";
+        if (draftTip) draftTip.textContent = "正在按「完成 / 问题 / 计划 / 支持」整理，请稍等…";
+        try {
+          var res = await apiPost("/api/organize", { text: raw });
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "整理失败");
+          briefEl.value = (data.text || "").trim();
+          briefEl.dispatchEvent(new Event("input"));
+          if (draftTip) draftTip.textContent = "已整理为四段式素材稿，可以继续修改。";
+        } catch (err) {
+          var organized = organizeBrief(raw);
+          if (organized) {
+            briefEl.value = organized;
+            briefEl.dispatchEvent(new Event("input"));
+          }
+          if (draftTip) draftTip.textContent = "AI 整理失败，已用本地规则整理：" + (err.message || "请稍后重试");
+        } finally {
+          parseBtn.disabled = false;
+          parseBtn.textContent = oldLabel;
+        }
       });
     }
 

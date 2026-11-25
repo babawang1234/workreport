@@ -47,6 +47,7 @@ from core.prompts import (
     REPORT_TYPES,
     build_aggregate_prompt,
     build_generation_prompt,
+    build_organize_prompt,
     build_summarize_prompt,
     plan_section_of,
     build_refine_prompt,
@@ -700,6 +701,36 @@ async def api_summarize(request: Request):
         "limit": limit,
         "summary_error": err,
     }
+
+
+@app.post("/api/organize")
+async def api_organize(request: Request):
+    """把粘贴的杂乱内容整理成四段式素材稿（归类、去噪、合并同主题）。"""
+    _import_rate_limit(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="请求格式错误")
+    text = str(body.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="没有可整理的内容")
+    messages = build_organize_prompt(text)
+
+    def _run() -> str:
+        return "".join(llm.stream_chat(messages, temperature=0.3)).strip()
+
+    try:
+        out = await run_in_threadpool(_run)
+    except LLMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    if out.startswith("```"):
+        out = out.split("\n", 1)[-1]
+    if out.endswith("```"):
+        out = out[:-3]
+    out = "\n".join(re.sub(r"^#{1,6}\s*", "", line).replace("**", "") for line in out.strip().splitlines())
+    if not out:
+        raise HTTPException(status_code=502, detail="模型没有返回内容，请稍后重试")
+    return {"text": out, "chars": len(out)}
 
 
 @app.post("/api/push")

@@ -31,6 +31,7 @@
   - 多文件逐个上传分析：每个文件独立显示进度条与总结预览，可分别编辑后一次填入输入框
   - 素材分析规范放在 `core/skills/material_summary.md`（核心结论 + 关键成果/数据/风险/下一步），改这个文件即可调整总结风格
 - 群推送：报告详情页「推送到群」支持飞书 / 钉钉 / 企业微信官方群机器人 Webhook（`core/push.py`、`/api/push`）
+- 智能整理：「智能整理粘贴内容」走 `/api/organize`（`build_organize_prompt`）按四段式归类去噪，失败时回退本地规则 `organizeBrief`
   - 白名单域名校验防 SSRF；飞书/钉钉支持加签；企业微信 markdown 超 4096 字节自动截断
   - Webhook 只存浏览器 localStorage，不落服务器；个人微信 / QQ 无官方接口，不做
 - 管理员测试账号：登录后台后访问 `/write`、`/reports` 自动按固定测试码（默认 `ADMIN-ZB2026`，可用 `TEST_CODE` 覆盖）计无限额度，报告可正常保存、查看、删除
