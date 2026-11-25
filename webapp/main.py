@@ -46,6 +46,7 @@ from core.prompts import (
     REPORT_TYPES,
     build_aggregate_prompt,
     build_generation_prompt,
+    build_summarize_prompt,
     plan_section_of,
     build_refine_prompt,
 )
@@ -544,32 +545,91 @@ async def api_transcribe(request: Request, file: UploadFile = File(...)):
     return {"text": text}
 
 
+def _cut_text(text: str, limit: int) -> str:
+    """按行/句截断到 limit 字以内，避免模型超字数。"""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    clipped = text[:limit]
+    for sep in ("\n", "。", "；"):
+        idx = clipped.rfind(sep)
+        if idx >= int(limit * 0.6):
+            return clipped[: idx + 1].rstrip()
+    return clipped.rstrip("，、；;")
+
+
+def _summarize_material(text: str, limit: int, position: str, report_type: str) -> tuple[str, bool, str]:
+    """把素材提炼成 limit 字以内的要点，返回 (正文, 是否已提炼, 失败原因)。"""
+    limit = max(0, min(1200, int(limit or 0)))
+    if limit <= 0 or len(text) <= limit:
+        return text, False, ""
+    try:
+        messages = build_summarize_prompt(text=text, limit=limit, position=position, report_type=report_type)
+        out = "".join(llm.stream_chat(messages, temperature=0.3)).strip()
+    except LLMError as exc:
+        return text, False, str(exc)
+    if out.startswith("```"):
+        out = out.split("\n", 1)[-1]
+    if out.endswith("```"):
+        out = out[:-3]
+    out = out.strip()
+    if not out:
+        return text, False, "模型没有返回内容"
+    return _cut_text(out, limit), True, ""
+
+
 @app.post("/api/extract")
-async def api_extract(request: Request, file: UploadFile = File(...)):
-    """上传 Word/Excel/PPT/PDF/图片/文本，返回提炼后的纯文本。"""
+async def api_extract(
+    request: Request,
+    file: UploadFile = File(...),
+    limit: int = Form(0),
+    position: str = Form(""),
+    report_type: str = Form("周报"),
+):
+    """上传 Word/Excel/PPT/PDF/图片/文本，提炼后返回纯文本。"""
     _api_auth(request)
     raw = await file.read()
     try:
         text = await run_in_threadpool(extractor.extract_file, raw, file.filename or "")
     except extractor.ExtractError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return {"text": text, "chars": len(text), "filename": file.filename or ""}
+    final, summarized, err = await run_in_threadpool(_summarize_material, text, limit, position, report_type)
+    return {
+        "text": final,
+        "chars": len(final),
+        "raw_chars": len(text),
+        "summarized": summarized,
+        "limit": limit,
+        "summary_error": err,
+        "filename": file.filename or "",
+    }
 
 
 @app.post("/api/extract-url")
 async def api_extract_url(request: Request):
-    """抓取网页链接正文，返回纯文本。"""
+    """抓取网页链接正文，提炼后返回纯文本。"""
     _api_auth(request)
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="请求格式错误")
     url = str(body.get("url") or "").strip()
+    limit = int(body.get("limit") or 0)
+    position = str(body.get("position") or "")
+    report_type = str(body.get("report_type") or "周报")
     try:
         text = await run_in_threadpool(extractor.extract_link, url)
     except extractor.ExtractError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return {"text": text, "chars": len(text)}
+    final, summarized, err = await run_in_threadpool(_summarize_material, text, limit, position, report_type)
+    return {
+        "text": final,
+        "chars": len(final),
+        "raw_chars": len(text),
+        "summarized": summarized,
+        "limit": limit,
+        "summary_error": err,
+    }
 
 
 @app.post("/api/aggregate")

@@ -744,6 +744,15 @@
     var extractUrl = $("#extract-url");
     var extractUrlBtn = $("#extract-url-btn");
     var extractStatus = $("#extract-status");
+    var extractLimit = $("#extract-limit");
+
+    var extractOptions = function () {
+      return {
+        limit: extractLimit ? parseInt(extractLimit.value, 10) || 0 : 0,
+        position: genForm.position.value,
+        report_type: genForm.report_type.value
+      };
+    };
 
     var setExtractStatus = function (msg, bad) {
       if (!extractStatus) return;
@@ -751,7 +760,7 @@
       extractStatus.classList.toggle("err", !!bad);
     };
 
-    var appendBrief = function (text, label) {
+    var appendBrief = function (text, label, meta) {
       var piece = (text || "").trim();
       if (!briefEl) return;
       if (!piece) {
@@ -761,7 +770,17 @@
       var cur = (briefEl.value || "").trim();
       briefEl.value = cur ? cur + "\n\n" + piece : piece;
       briefEl.dispatchEvent(new Event("input"));
-      setExtractStatus("已导入" + (label || "素材") + "，共 " + piece.length + " 字");
+
+      var info = meta || {};
+      if (info.summarized) {
+        setExtractStatus("已提炼" + (label || "素材") + "：" + info.raw_chars + " 字 → " + piece.length + " 字（目标 " + info.limit + " 字）");
+      } else if (info.summary_error) {
+        setExtractStatus("提炼失败，已导入原文（" + piece.length + " 字）：" + info.summary_error, true);
+      } else if (info.limit) {
+        setExtractStatus("原文共 " + piece.length + " 字，未超过 " + info.limit + " 字，已直接导入");
+      } else {
+        setExtractStatus("已导入" + (label || "素材") + "，共 " + piece.length + " 字");
+      }
     };
 
     if (extractFile && briefEl) {
@@ -773,14 +792,18 @@
           extractFile.value = "";
           return;
         }
-        setExtractStatus("正在解析「" + file.name + "」…");
+        var opts = extractOptions();
+        setExtractStatus(opts.limit ? "正在解析并提炼「" + file.name + "」…" : "正在解析「" + file.name + "」…");
         var fd = new FormData();
         fd.append("file", file);
+        fd.append("limit", String(opts.limit));
+        fd.append("position", opts.position);
+        fd.append("report_type", opts.report_type);
         try {
           var res = await fetch("/api/extract", { method: "POST", body: fd });
           var data = await res.json().catch(function () { return {}; });
           if (!res.ok) throw new Error(data.detail || "解析失败（" + res.status + "）");
-          appendBrief(data.text, "文件");
+          appendBrief(data.text, "文件", data);
         } catch (err) {
           setExtractStatus(err.message || "解析失败，请稍后重试", true);
         } finally {
@@ -797,11 +820,17 @@
         return;
       }
       if (extractUrlBtn) extractUrlBtn.disabled = true;
-      setExtractStatus("正在读取网页正文…");
+      var opts = extractOptions();
+      setExtractStatus(opts.limit ? "正在读取网页并提炼正文…" : "正在读取网页正文…");
       try {
-        var res = await apiPost("/api/extract-url", { url: url });
+        var res = await apiPost("/api/extract-url", {
+          url: url,
+          limit: opts.limit,
+          position: opts.position,
+          report_type: opts.report_type
+        });
         var data = await res.json();
-        appendBrief(data.text, "链接正文");
+        appendBrief(data.text, "链接正文", data);
         extractUrl.value = "";
       } catch (err) {
         setExtractStatus(err.message || "读取失败，请稍后重试", true);

@@ -91,6 +91,18 @@
         <summary><span>导入素材：Word / Excel / PPT / PDF / 截图 / 链接</span><b>自动提炼</b></summary>
         <div class="inbox-body">
           <div class="extract-row">
+            <label class="extract-limit">
+              <span>提炼字数</span>
+              <select id="extract-limit">
+                <option value="200">精简 · 200 字</option>
+                <option value="400" selected>标准 · 400 字</option>
+                <option value="800">详细 · 800 字</option>
+                <option value="0">不提炼 · 用原文</option>
+              </select>
+            </label>
+            <span class="muted small">按上限把素材归纳成要点，字数越少越精简</span>
+          </div>
+          <div class="extract-row">
             <label class="btn ghost sm extract-pick">
               <input type="file" id="extract-file" accept=".docx,.xlsx,.pptx,.pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp">
               <span>选择文件</span>
