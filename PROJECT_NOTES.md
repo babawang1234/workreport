@@ -25,6 +25,7 @@
 - 全站标题字体统一（字重 700 / 字距 -0.018em）
 - 记忆衔接：写周报自动衔接上一期计划（`link_prev` + `plan_section_of`），报告页一键汇总月报 / 季度总结（`/api/aggregate`）
 - 文件上传提炼：Word / Excel / PPT / PDF / 截图 / 网页链接 → 自动转成素材写入输入框（`core/extract.py`、`/api/extract`、`/api/extract-url`）
+  - 导入前可选「提炼字数」：精简 200 / 标准 400 / 详细 800 / 不提炼，服务端用 `build_summarize_prompt` 按字数上限归纳成要点清单
 
 ## 待办（下一步，按优先级）
 
