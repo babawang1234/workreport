@@ -12,6 +12,26 @@
   </div>
 </section>
 
+{% if total >= 2 %}
+<section class="card agg-card">
+  <div class="agg-head">
+    <div>
+      <h2 class="card-title">一键汇总</h2>
+      <p class="muted small">把本周期已保存的日报、周报提炼成一份月报或季度总结：自动去重、按模块归类、对照计划。</p>
+    </div>
+    <div class="agg-actions">
+      <select id="agg-type" aria-label="汇总类型">
+        <option value="月报">汇总为月报（本月）</option>
+        <option value="季度总结">汇总为季度总结（本季度）</option>
+      </select>
+      <button type="button" class="btn primary sm" id="agg-btn">开始汇总</button>
+    </div>
+  </div>
+  <div id="agg-stream" class="stream-box hidden"><pre id="agg-text" class="stream-text"></pre></div>
+  <div id="agg-status" class="status"></div>
+</section>
+{% endif %}
+
 <form method="get" action="/reports" class="filter-bar">
   <input type="search" name="q" value="{{ q }}" placeholder="搜索标题或正文关键词，例如：登录页、数据看板">
   <label class="date-field"><span>开始</span><input type="date" name="start" value="{{ start }}"></label>

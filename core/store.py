@@ -515,6 +515,33 @@ def list_reports(code: str, limit: int = 60) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def latest_report(code: str, report_type: str) -> dict | None:
+    """取该账号最近一份同类型报告，用于衔接上一期计划。"""
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT id, title, report_type, period, content, created_at FROM reports"
+            " WHERE code = ? AND report_type = ? ORDER BY created_at DESC, id DESC LIMIT 1",
+            (code, report_type),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def reports_between(code: str, start: str, end: str, exclude_type: str = "") -> list[dict]:
+    """按日期区间取报告（含起止日），用于一键汇总月报/季报。"""
+    sql = (
+        "SELECT id, title, position, report_type, period, content, created_at FROM reports"
+        " WHERE code = ? AND substr(created_at, 1, 10) BETWEEN ? AND ?"
+    )
+    args: list = [code, start, end]
+    if exclude_type:
+        sql += " AND report_type != ?"
+        args.append(exclude_type)
+    sql += " ORDER BY created_at ASC"
+    with _conn() as conn:
+        rows = conn.execute(sql, args).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_report(report_id: int, code: str) -> dict | None:
     with _conn() as conn:
         row = conn.execute(

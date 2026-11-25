@@ -158,6 +158,7 @@ def build_generation_prompt(
     period: str,
     brief: str,
     extra: str = "",
+    prev_plan: str = "",
 ) -> list[dict[str, str]]:
     pos = POSITIONS.get(position, POSITIONS["通用白领"])
     rules = REPORT_TYPE_RULES.get(report_type, REPORT_TYPE_RULES["周报"])
@@ -204,6 +205,13 @@ def build_generation_prompt(
 
 {brief.strip()}
 """
+    if prev_plan.strip():
+        user += (
+            "\n以下是我上一期写下的计划（仅用于对照衔接，不属于本期新增事实）：\n"
+            f"<上期计划>\n{prev_plan.strip()[:1500]}\n</上期计划>\n"
+            "请在本期成果部分逐项对照上期计划交代：已完成的写清结果与数据，未完成的说明原因或顺延到本期计划并给出新的时间点；"
+            "不得遗漏计划项，也不得编造完成情况（没有进展就写「未推进，原因是……」）。\n"
+        )
     if extra.strip():
         user += f"\n额外要求（优先级最高）：{extra.strip()}\n"
 
@@ -212,6 +220,88 @@ def build_generation_prompt(
         "只使用我提供的信息、不得编造任何数据，缺数据用【待补充：xx】。输出前自检字数，不足则把已提及事项的做法与影响写细，不要用空话凑数。"
     )
     user += "\n请直接输出可以提交的汇报正文。"
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def plan_section_of(content: str, report_type: str) -> str:
+    """从一份报告正文里抽出「计划」模块的条目，用于衔接下一期。"""
+    rules = REPORT_TYPE_RULES.get(report_type) or REPORT_TYPE_RULES["周报"]
+    plan_title = rules["modules"][2]
+    picked: list[str] = []
+    inside = False
+    for line in (content or "").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            inside = plan_title in stripped
+            continue
+        if inside and stripped:
+            picked.append(stripped)
+    return "\n".join(picked).strip()
+
+
+def build_aggregate_prompt(
+    *,
+    target_type: str,
+    position: str,
+    audience: str,
+    length_key: str,
+    period: str,
+    records: list[dict],
+) -> list[dict[str, str]]:
+    """把一段时间内的多份汇报汇总提炼成月报或季度总结。"""
+    pos = POSITIONS.get(position, POSITIONS["通用白领"])
+    rules = REPORT_TYPE_RULES.get(target_type, REPORT_TYPE_RULES["月报"])
+    length_label, target_words = LENGTHS.get(length_key, ("标准", 500))
+    audience_rule = AUDIENCE_RULES.get(audience, AUDIENCE_RULES["直属上级"])
+    modules = "\n".join(f"{_cn_num(i + 1)}、{m}" for i, m in enumerate(rules["modules"]))
+
+    blocks: list[str] = []
+    for r in records:
+        text = (r.get("content") or "").strip()
+        if not text:
+            continue
+        blocks.append(f"【{r.get('report_type', '')}｜{r.get('period', '')}】\n{text[:2600]}")
+    source = "\n\n".join(blocks)[:11000]
+
+    system = (
+        SYSTEM_PROMPT
+        + f"""
+
+【本次任务】汇总提炼，不是重写。把多份日常汇报归纳成一份{target_type}。
+【本次岗位】{position}
+- 关注重点：{pos['focus']}
+- 话术风格：{pos['style']}
+
+【目标汇报类型】{target_type}
+- 固定模块（按序输出，标题形如「### 一、{rules['modules'][0]}」）：
+{modules}
+- 结构要求：{rules['rule']}
+- 成果条目数量：{rules['count']} 条
+
+【汇报对象】{audience}
+- 表达侧重：{audience_rule}
+
+【篇幅】{length_label}，正文写到 {target_words} 字左右（下限 {int(target_words * 0.9)} 字、上限 {int(target_words * 1.2)} 字）。"""
+    )
+
+    user = f"""我的岗位：{position}
+目标汇报类型：{target_type}
+汇总周期：{period}
+汇报对象：{audience}
+
+以下是我在这个周期内已完成的多份汇报原文，请汇总提炼：
+
+{source}
+
+汇总要求：
+1. 只做归纳合并与视角提升，不得新增原文中不存在的事实、数字、项目名、客户名；缺数据的位置用【待补充：xx】。
+2. 去重合并：同一件事在多份里重复出现时合并为一条，保留最新进度和数字，不重复罗列。
+3. 视角提升：从「做了什么」抬到「带来什么变化/价值」，能量化的写达成率、环比、绝对值变化。
+4. 计划承接：上一份汇报里写了但没完成的计划，要在问题或下期计划中交代，说明原因或新的时间点。
+5. 模块内用「- 」无序列表，每条 1-2 行，每条 40 字以上。
+
+第一行输出标题（Markdown 一级标题 # ），格式：{position}{target_type}（{period}）
+只输出 Markdown 正文，不要用代码块包裹。"""
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 

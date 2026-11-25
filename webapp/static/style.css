@@ -2798,3 +2798,35 @@ html, body { overflow-x: clip; }
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* ---------------- 衔接上期计划 / 一键汇总 ---------------- */
+.check-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.check-line input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+.agg-card { margin-bottom: 18px; }
+.agg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.agg-head .card-title { margin-bottom: 6px; }
+.agg-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.agg-actions select {
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.agg-card .stream-box { margin-top: 14px; }

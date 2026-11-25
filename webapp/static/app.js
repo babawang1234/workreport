@@ -1231,7 +1231,8 @@
           audience: genForm.audience.value,
           length_key: genForm.length_key.value,
           period: periodInput ? periodInput.value : "",
-          extra: genForm.extra.value
+          extra: genForm.extra.value,
+          link_prev: genForm.link_prev ? genForm.link_prev.checked : true
         });
         await streamSSE(res, function (data) {
           if (data.type === "chunk") {
@@ -1732,4 +1733,42 @@
       }
     });
   }
+  window.zbApiPost = apiPost;
+  window.zbStreamSSE = streamSSE;
+})();
+(function () {
+  var btn = document.getElementById("agg-btn");
+  if (!btn) return;
+  var typeSel = document.getElementById("agg-type");
+  var box = document.getElementById("agg-stream");
+  var text = document.getElementById("agg-text");
+  var status = document.getElementById("agg-status");
+
+  btn.addEventListener("click", async function () {
+    btn.disabled = true;
+    box.classList.remove("hidden");
+    text.textContent = "";
+    status.className = "status";
+    status.textContent = "正在汇总，约需 20-40 秒…";
+    try {
+      var res = await window.zbApiPost("/api/aggregate", { target_type: typeSel.value });
+      await window.zbStreamSSE(res, function (data) {
+        if (data.type === "chunk") {
+          text.textContent += data.text;
+        } else if (data.type === "progress") {
+          status.textContent = data.text;
+        } else if (data.type === "error") {
+          status.className = "status err";
+          status.textContent = data.message;
+        } else if (data.type === "done") {
+          status.textContent = "汇总完成，正在打开…";
+          window.location.href = "/reports/" + data.report_id;
+        }
+      });
+    } catch (err) {
+      status.className = "status err";
+      status.textContent = err.message || "汇总失败，请稍后重试";
+    }
+    btn.disabled = false;
+  });
 })();

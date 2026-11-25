@@ -42,7 +42,9 @@ from core.prompts import (
     POSITIONS,
     QUICK_ACTIONS,
     REPORT_TYPES,
+    build_aggregate_prompt,
     build_generation_prompt,
+    plan_section_of,
     build_refine_prompt,
 )
 
@@ -422,6 +424,18 @@ async def api_generate(request: Request):
     if not trial_mode and info["remaining"] == 0:
         raise HTTPException(status_code=400, detail="可用次数已用完，请激活新的兑换码")
 
+    code = info["code"] if info else ""
+
+    # 自动衔接上一期计划：同类型最近一份报告里的「计划」模块
+    prev_plan = ""
+    if body.get("link_prev", True) and not trial_mode:
+        try:
+            prev = store.latest_report(code, report_type)
+            if prev:
+                prev_plan = plan_section_of(prev["content"], report_type)
+        except Exception:
+            prev_plan = ""
+
     messages = build_generation_prompt(
         report_type=report_type,
         position=position,
@@ -430,8 +444,8 @@ async def api_generate(request: Request):
         period=period,
         brief=brief,
         extra=extra,
+        prev_plan=prev_plan,
     )
-    code = info["code"] if info else ""
 
     def stream():
         chunks: list[str] = []
@@ -526,6 +540,119 @@ async def api_transcribe(request: Request, file: UploadFile = File(...)):
     if not text:
         raise HTTPException(status_code=400, detail="没有识别到内容，请重新说一次")
     return {"text": text}
+
+
+@app.post("/api/aggregate")
+async def api_aggregate(request: Request):
+    """一键汇总：把本周期内的多份汇报提炼成月报或季度总结。"""
+    info, token = _api_auth(request)
+
+    ip = (request.headers.get("x-real-ip") or (request.client.host if request.client else "")).strip()
+    now_ts = time.time()
+    hits = [t for t in _GEN_HITS.get(ip, []) if now_ts - t < _GEN_WINDOW]
+    if len(hits) >= _GEN_LIMIT:
+        raise HTTPException(status_code=429, detail="操作太频繁，请稍后再试")
+    hits.append(now_ts)
+    _GEN_HITS[ip] = hits
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="请求格式错误")
+
+    target_type = str(body.get("target_type") or "月报")
+    if target_type not in ("月报", "季度总结"):
+        raise HTTPException(status_code=400, detail="只支持汇总为月报或季度总结")
+
+    today = datetime.now().date()
+    start = str(body.get("start") or "").strip()
+    end = str(body.get("end") or "").strip() or today.isoformat()
+    if target_type == "月报":
+        start = start or today.replace(day=1).isoformat()
+        period = f"{today.year}年{today.month}月"
+    else:
+        quarter = (today.month - 1) // 3 + 1
+        start = start or today.replace(month=3 * (quarter - 1) + 1, day=1).isoformat()
+        period = f"{today.year}年 Q{quarter}"
+
+    records = store.reports_between(info["code"], start, end, exclude_type=target_type)
+    if len(records) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{start} 到 {end} 只有 {len(records)} 份汇报，至少需要 2 份才能汇总",
+        )
+    if info["remaining"] == 0:
+        raise HTTPException(status_code=400, detail="可用次数已用完，请激活新的兑换码")
+
+    position = str(body.get("position") or "").strip()
+    if position not in POSITIONS:
+        position = records[-1].get("position") or "通用白领"
+    audience = str(body.get("audience") or "")
+    if audience not in AUDIENCES:
+        audience = AUDIENCES[0]
+    length_key = str(body.get("length_key") or DEFAULT_LENGTH)
+    if length_key not in LENGTHS:
+        length_key = DEFAULT_LENGTH
+
+    messages = build_aggregate_prompt(
+        target_type=target_type,
+        position=position,
+        audience=audience,
+        length_key=length_key,
+        period=period,
+        records=records,
+    )
+    code = info["code"]
+
+    def stream():
+        chunks: list[str] = []
+        try:
+            for chunk in llm.stream_chat(messages, temperature=0.4):
+                if chunk:
+                    chunks.append(chunk)
+                    yield _sse({"type": "chunk", "text": chunk})
+        except LLMError as exc:
+            yield _sse({"type": "error", "message": str(exc)})
+            return
+        except Exception:
+            yield _sse({"type": "error", "message": "汇总失败，请稍后重试"})
+            return
+
+        content = "".join(chunks).strip()
+        if not content:
+            yield _sse({"type": "error", "message": "模型没有返回内容，请稍后重试"})
+            return
+
+        guess = f"{position}{target_type}（{period}）"
+        title = ensure_title(content, guess).splitlines()[0].lstrip("# ").strip() or guess
+        yield _sse({"type": "progress", "text": f"已汇总 {len(records)} 份汇报，正在保存…"})
+        try:
+            report_id = store.save_report(
+                code,
+                title=title,
+                position=position,
+                report_type=target_type,
+                period=period,
+                content=content,
+                versions=[{"label": "汇总初稿", "text": content}],
+            )
+        except Exception:
+            yield _sse({"type": "error", "message": "报告保存失败，请稍后重试"})
+            return
+
+        ok, left = store.consume(token)
+        yield _sse(
+            {
+                "type": "done",
+                "report_id": report_id,
+                "title": title,
+                "remaining": left if ok else info["remaining"],
+                "code": code,
+                "sources": len(records),
+            }
+        )
+
+    return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 @app.post("/api/refine/{report_id}")
