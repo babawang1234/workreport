@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import html
 import json
+import re
 import secrets
 import time
 from datetime import datetime, timedelta
@@ -575,7 +576,7 @@ def _cut_text(text: str, limit: int) -> str:
 def _summarize_material(text: str, limit: int, position: str, report_type: str) -> tuple[str, bool, str]:
     """把素材提炼成 limit 字以内的要点，返回 (正文, 是否已提炼, 失败原因)。"""
     limit = max(0, min(1200, int(limit or 0)))
-    if limit <= 0 or len(text) <= limit:
+    if limit <= 0:
         return text, False, ""
     try:
         messages = build_summarize_prompt(text=text, limit=limit, position=position, report_type=report_type)
@@ -589,7 +590,11 @@ def _summarize_material(text: str, limit: int, position: str, report_type: str) 
     out = out.strip()
     if not out:
         return text, False, "模型没有返回内容"
-    return _cut_text(out, limit), True, ""
+    # 去掉模型偶尔加的 Markdown 标题符号，并清掉被截断后留下的空段落标题
+    out = "\n".join(re.sub(r"^#{1,6}\s*", "", line).replace("**", "") for line in out.splitlines())
+    final = _cut_text(out, limit)
+    final = re.sub(r"(\n|^)[-【][^\n]{0,40}[:：]\s*$", "", final).strip()
+    return final, True, ""
 
 
 @app.post("/api/extract")

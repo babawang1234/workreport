@@ -104,22 +104,22 @@
           </label>
         </div>
         <label class="dropzone" id="extract-drop">
-          <input type="file" id="extract-file" accept=".docx,.xlsx,.pptx,.pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp">
+          <input type="file" id="extract-file" accept=".docx,.xlsx,.pptx,.pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp" multiple>
           <span class="dropzone-icon" aria-hidden="true">⇪</span>
           <b class="dropzone-title">拖拽文件到这里，或点击选择</b>
-          <span class="muted small">支持 Word / Excel / PPT / PDF / 截图 / txt / md / csv，大图自动压缩</span>
+          <span class="muted small">支持 Word / Excel / PPT / PDF / 截图 / txt / md / csv，可一次选多个，大图自动压缩</span>
         </label>
+        <div class="upload-list" id="upload-list"></div>
         <div class="import-link">
           <input type="url" id="extract-url" placeholder="或粘贴网页链接，自动抓取正文">
           <button type="button" class="btn sm" id="extract-url-btn">读取链接</button>
         </div>
         <p class="muted small extract-status" id="extract-status"></p>
         <div class="extract-preview hidden" id="extract-preview">
-          <p class="extract-preview-head" id="extract-preview-head"></p>
-          <textarea id="extract-preview-text" rows="6" placeholder="提炼结果会显示在这里"></textarea>
+          <div id="extract-preview-list"></div>
           <div class="extract-preview-actions">
             <button type="button" class="btn primary sm" id="extract-preview-apply">采用并填入</button>
-            <button type="button" class="btn ghost sm" id="extract-preview-retry">按当前字数重试</button>
+            <button type="button" class="btn ghost sm" id="extract-preview-retry">按当前字数重新分析</button>
             <button type="button" class="btn ghost sm" id="extract-preview-cancel">取消</button>
           </div>
         </div>

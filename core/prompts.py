@@ -2,6 +2,20 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
+
+SKILL_DIR = Path(__file__).resolve().parent / "skills"
+
+
+@lru_cache(maxsize=8)
+def load_skill(name: str) -> str:
+    """读取 skills/*.md 里的分析规范；文件缺失时返回空串，不影响主流程。"""
+    try:
+        return (SKILL_DIR / f"{name}.md").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
 REPORT_TYPES = ["日报", "周报", "月报", "季度总结"]
 
 AUDIENCES = ["直属上级", "部门负责人", "公司高管", "跨部门协作方"]
@@ -324,34 +338,42 @@ def build_summarize_prompt(
     position: str = "",
     report_type: str = "周报",
 ) -> list[dict[str, str]]:
-    """把导入的原始素材提炼成可直接写汇报的要点，字数受 limit 约束。"""
+    """把导入的原始素材分析成结构化总结（结论 + 成果 / 数据 / 风险 / 下一步），字数受 limit 约束。"""
     limit = max(120, min(1200, int(limit)))
     pos = POSITIONS.get(position) or {}
     focus = f"\n- 岗位关注重点：{pos['focus']}" if pos.get("focus") else ""
-    count_hint = "3-4" if limit <= 250 else ("5-7" if limit <= 500 else "8-12")
+    if limit <= 250:
+        count_hint = "2-3 条"
+    elif limit <= 500:
+        count_hint = "4-6 条"
+    else:
+        count_hint = "6-10 条"
+    skill = load_skill("material_summary")
 
     system = SYSTEM_PROMPT + f"""
 
-【本次任务】素材提炼，不是写汇报。把用户导入的原始素材（文档正文、会议记录、网页、截图文字）压缩成写{report_type}时可直接使用的要点清单。
-- 只保留对写{report_type}有用的事实：做了什么、结果数字、时间点、项目名、卡点与后续计划。{focus}
-- 不得新增原文没有的事实、数字、人名、项目；原文没说的不写。
-- 删除寒暄、导航、广告、重复句、无信息量的铺陈。
-- 同一件事只保留一条；素材里重复出现时合并成一条，绝不重复输出同一条。
-- 字数不够时，宁可舍弃次要条目，也不要把不相关的事硬塞进同一条。
-- 每条以「- 」开头，一条一件事，尽量带上数字或专有名词。
-- 不要输出标题、不要输出总结性套话、不要用代码块包裹。"""
+【本次任务】分析并总结素材，不是写汇报，也不是逐句摘抄。用户导入的是文档、会议记录、网页或截图文字，你要读懂它、判断重点，输出写{report_type}时可以直接采用的总结。{focus}
 
-    user = f"""下面是要提炼的原始素材（可能来自文档、网页或截图识别，含少量无关内容）：
+【分析规范】
+{skill or "先归并同类信息，按重要性排序；区分事实与计划；保留数字与专有名词；不新增原文没有的内容。"}
+
+【硬性要求】
+- 总字数不超过 {limit} 字，尽量接近 {limit} 字；写不下时先压缩描述，不要删关键数字。
+- 必须包含「【核心结论】」一行，其余按规范的结构段落输出。
+- 只输出总结本身，不要解释分析过程，不要用代码块包裹。"""
+
+    user = f"""下面是要分析的原始素材（可能来自文档、网页或截图识别，含少量无关内容）：
 
 <素材>
 {text[:12000]}
 </素材>
 
 要求：
-1. 输出 {count_hint} 条要点，总字数尽量接近 {limit} 字、但不超过 {limit} 字，不少于 {int(limit * 0.85)} 字。
-2. 素材里的数字、时间、项目名、人名一个都不能丢，宁可把每条写长一点，也不要用套话凑字数。
-3. 按重要性排序，与工作成果、数据、进度相关的排前面。
-4. 只输出要点清单本身，不要任何解释。"""
+1. 先给一句话【核心结论】，再按「关键成果 / 关键数据 / 问题与风险 / 下一步」输出 {count_hint} 要点；没有内容的段落省略，但素材里有计划、待办或依赖时「下一步」必须写。
+2. 目标 {int(limit * 0.8)} 字左右，硬上限 {limit} 字；宁可比目标短，也不要写到一半被截断。
+3. 素材里的数字、时间、项目名、人名一个都不能丢，宁可把每条写具体，也不要用套话凑字数。
+4. 按重要性排序，与成果、数据、进度相关的排前面。
+5. 只输出总结，不要任何解释。"""
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 

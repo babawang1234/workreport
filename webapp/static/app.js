@@ -760,29 +760,6 @@
       extractStatus.classList.toggle("err", !!bad);
     };
 
-    var appendBrief = function (text, label, meta) {
-      var piece = (text || "").trim();
-      if (!briefEl) return;
-      if (!piece) {
-        setExtractStatus("没有提取到文字内容，请换一份再试", true);
-        return;
-      }
-      var cur = (briefEl.value || "").trim();
-      briefEl.value = cur ? cur + "\n\n" + piece : piece;
-      briefEl.dispatchEvent(new Event("input"));
-
-      var info = meta || {};
-      if (info.summarized) {
-        setExtractStatus("已提炼" + (label || "素材") + "：" + info.raw_chars + " 字 → " + piece.length + " 字（目标 " + info.limit + " 字）");
-      } else if (info.summary_error) {
-        setExtractStatus("提炼失败，已导入原文（" + piece.length + " 字）：" + info.summary_error, true);
-      } else if (info.limit) {
-        setExtractStatus("原文共 " + piece.length + " 字，未超过 " + info.limit + " 字，已直接导入");
-      } else {
-        setExtractStatus("已导入" + (label || "素材") + "，共 " + piece.length + " 字");
-      }
-    };
-
     /* ---------- 大图自动压缩，避免上传失败 ---------- */
     var compressImage = function (file) {
       if (!file.type || file.type.indexOf("image/") !== 0) return Promise.resolve(file);
@@ -816,16 +793,78 @@
 
     /* ---------- 预览确认 ---------- */
     var previewBox = $("#extract-preview");
-    var previewHead = $("#extract-preview-head");
-    var previewText = $("#extract-preview-text");
+    var previewList = $("#extract-preview-list");
+    var uploadList = $("#upload-list");
     var previewApply = $("#extract-preview-apply");
     var previewRetry = $("#extract-preview-retry");
     var previewCancel = $("#extract-preview-cancel");
-    var pending = null;
+    var pending = [];
 
     var hidePreview = function () {
       if (previewBox) previewBox.classList.add("hidden");
-      pending = null;
+      pending = [];
+      if (previewList) previewList.innerHTML = "";
+    };
+
+    var renderPreview = function () {
+      if (!previewList) return;
+      previewList.innerHTML = "";
+      pending.forEach(function (item, idx) {
+        var block = document.createElement("div");
+        block.className = "preview-item";
+        var head = document.createElement("p");
+        head.className = "preview-item-head";
+        head.textContent = (pending.length > 1 ? "第 " + (idx + 1) + "／" + pending.length + " 份 · " : "") + item.label + " · " + item.note;
+        var area = document.createElement("textarea");
+        area.rows = 5;
+        area.value = item.text;
+        area.addEventListener("input", function () { item.text = area.value; });
+        block.appendChild(head);
+        block.appendChild(area);
+        previewList.appendChild(block);
+      });
+    };
+
+    var addResult = function (data, label) {
+      pending.push({
+        raw: data.raw_text || data.text || "",
+        text: data.text || "",
+        label: label || "素材",
+        note: previewSummary(data)
+      });
+      renderPreview();
+      if (previewBox) previewBox.classList.remove("hidden");
+    };
+
+    /* ---------- 上传进度条 ---------- */
+    var createRow = function (name, size) {
+      var row = document.createElement("div");
+      row.className = "upload-row";
+      var top = document.createElement("div");
+      top.className = "upload-row-top";
+      var title = document.createElement("span");
+      title.className = "upload-name";
+      title.textContent = name;
+      var note = document.createElement("span");
+      note.className = "upload-note";
+      note.textContent = size ? (size / 1024 / 1024).toFixed(1) + "MB" : "";
+      top.appendChild(title);
+      top.appendChild(note);
+      var bar = document.createElement("div");
+      bar.className = "upload-bar";
+      var fill = document.createElement("i");
+      bar.appendChild(fill);
+      row.appendChild(top);
+      row.appendChild(bar);
+      if (uploadList) uploadList.appendChild(row);
+      return { row: row, note: note, fill: fill };
+    };
+
+    var updateRow = function (handle, pct, note, state) {
+      if (!handle) return;
+      handle.row.className = "upload-row" + (state ? " " + state : "");
+      handle.fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
+      if (note) handle.note.textContent = note;
     };
 
     var previewSummary = function (data) {
@@ -842,29 +881,21 @@
     };
 
     var showPreview = function (data, label) {
-      if (!previewBox || !previewText) {
-        appendBrief(data.text, label, data);
-        return;
-      }
-      pending = { raw: data.raw_text || data.text || "", label: label || "素材" };
-      if (previewHead) previewHead.textContent = previewSummary(data);
-      previewText.value = data.text || "";
-      previewBox.classList.remove("hidden");
-      setExtractStatus("");
+      addResult(data, label);
     };
 
     if (previewApply) {
       previewApply.addEventListener("click", function () {
-        if (!pending) return;
-        var text = (previewText.value || "").trim();
-        if (!text) {
-          setExtractStatus("预览内容为空，请重新导入", true);
+        var parts = pending.map(function (item) { return (item.text || "").trim(); }).filter(Boolean);
+        if (!parts.length) {
+          setExtractStatus("分析结果为空，请重新导入", true);
           return;
         }
+        var text = parts.join("\n\n");
         var cur = (briefEl.value || "").trim();
         briefEl.value = cur ? cur + "\n\n" + text : text;
         briefEl.dispatchEvent(new Event("input"));
-        setExtractStatus("已填入" + pending.label + "，共 " + text.length + " 字");
+        setExtractStatus("已填入 " + parts.length + " 份素材的分析结果，共 " + text.length + " 字");
         hidePreview();
       });
     }
@@ -878,63 +909,106 @@
 
     if (previewRetry) {
       previewRetry.addEventListener("click", async function () {
-        if (!pending) return;
+        if (!pending.length) return;
         var opts = extractOptions();
         if (!opts.limit) {
-          setExtractStatus("当前选择是不提炼，上方即为原文", true);
+          setExtractStatus("当前选择是不提炼，以上即为原文", true);
           return;
         }
         previewRetry.disabled = true;
-        setExtractStatus("正在按 " + opts.limit + " 字重新提炼…");
         try {
-          var res = await apiPost("/api/summarize", {
-            text: pending.raw,
-            limit: opts.limit,
-            position: opts.position,
-            report_type: opts.report_type
-          });
-          var data = await res.json();
-          showPreview(data, pending.label);
-          if (data.summary_error) setExtractStatus(data.summary_error, true);
-        } catch (err) {
-          setExtractStatus(err.message || "重新提炼失败，请稍后重试", true);
+          for (var i = 0; i < pending.length; i++) {
+            setExtractStatus("正在重新分析第 " + (i + 1) + "／" + pending.length + " 份…");
+            try {
+              var res = await apiPost("/api/summarize", {
+                text: pending[i].raw,
+                limit: opts.limit,
+                position: opts.position,
+                report_type: opts.report_type
+              });
+              var data = await res.json();
+              pending[i].text = data.text || pending[i].text;
+              pending[i].note = previewSummary(data);
+            } catch (err) {
+              pending[i].note = "重新分析失败：" + (err.message || "请稍后重试");
+            }
+          }
+          renderPreview();
+          setExtractStatus("已按 " + opts.limit + " 字重新分析 " + pending.length + " 份素材");
         } finally {
           previewRetry.disabled = false;
         }
       });
     }
 
-    var handleFile = async function (picked) {
-      if (!picked || !briefEl) return;
+    var uploadFile = function (file, opts, row) {
+      return new Promise(function (resolve, reject) {
+        var fd = new FormData();
+        fd.append("file", file);
+        fd.append("limit", String(opts.limit));
+        fd.append("position", opts.position);
+        fd.append("report_type", opts.report_type);
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/extract");
+        xhr.upload.onprogress = function (ev) {
+          if (!ev.lengthComputable) return;
+          var pct = Math.min(90, Math.round((ev.loaded / ev.total) * 90));
+          updateRow(row, pct, "上传中 " + pct + "%");
+        };
+        xhr.upload.onload = function () {
+          updateRow(row, 90, opts.limit ? "上传完成，正在分析总结…" : "上传完成，正在解析…", "busy");
+        };
+        xhr.onload = function () {
+          var data = {};
+          try { data = JSON.parse(xhr.responseText || "{}"); } catch (e) { /* 忽略 */ }
+          if (xhr.status >= 200 && xhr.status < 300) {
+            updateRow(row, 100, "分析完成 · 原文 " + data.raw_chars + " 字 → " + data.chars + " 字", "done");
+            resolve(data);
+          } else {
+            reject(new Error(data.detail || "解析失败（" + xhr.status + "）"));
+          }
+        };
+        xhr.onerror = function () { reject(new Error("上传失败，请检查网络")); };
+        xhr.send(fd);
+      });
+    };
+
+    var uploadBusy = false;
+    var handleFiles = async function (list) {
+      var arr = Array.prototype.slice.call(list || []);
+      if (!arr.length || !briefEl) return;
+      if (uploadBusy) {
+        setExtractStatus("上一批还在分析，请稍等…", true);
+        return;
+      }
+      uploadBusy = true;
       var opts = extractOptions();
-      hidePreview();
-      var file = picked;
-      if (picked.type && picked.type.indexOf("image/") === 0 && picked.size > 1.5 * 1024 * 1024) {
-        setExtractStatus("图片较大，正在自动压缩…");
-        file = await compressImage(picked);
+      var ok = 0;
+      for (var i = 0; i < arr.length; i++) {
+        var picked = arr[i];
+        var row = createRow(picked.name || "文件", picked.size);
+        try {
+          var file = picked;
+          if (picked.type && picked.type.indexOf("image/") === 0 && picked.size > 1.5 * 1024 * 1024) {
+            updateRow(row, 0, "图片较大，正在压缩…");
+            file = await compressImage(picked);
+          }
+          var data = await uploadFile(file, opts, row);
+          addResult(data, picked.name || "文件");
+          ok += 1;
+        } catch (err) {
+          updateRow(row, 100, err.message || "解析失败，请稍后重试", "err");
+        }
       }
-      setExtractStatus(opts.limit ? "正在解析并提炼「" + file.name + "」…" : "正在解析「" + file.name + "」…");
-      var fd = new FormData();
-      fd.append("file", file);
-      fd.append("limit", String(opts.limit));
-      fd.append("position", opts.position);
-      fd.append("report_type", opts.report_type);
-      try {
-        var res = await fetch("/api/extract", { method: "POST", body: fd });
-        var data = await res.json().catch(function () { return {}; });
-        if (!res.ok) throw new Error(data.detail || "解析失败（" + res.status + "）");
-        showPreview(data, "文件");
-      } catch (err) {
-        setExtractStatus(err.message || "解析失败，请稍后重试", true);
-      } finally {
-        if (extractFile) extractFile.value = "";
-      }
+      uploadBusy = false;
+      if (extractFile) extractFile.value = "";
+      if (ok) setExtractStatus("已分析 " + ok + " 份素材，确认后填入输入框");
+      else setExtractStatus("没有成功分析的素材", true);
     };
 
     if (extractFile && briefEl) {
       extractFile.addEventListener("change", function () {
-        var picked = extractFile.files && extractFile.files[0];
-        if (picked) handleFile(picked);
+        handleFiles(extractFile.files);
       });
     }
 
@@ -958,8 +1032,7 @@
       dropZone.addEventListener("drop", function (ev) {
         clearOver(ev);
         var dt = ev.dataTransfer;
-        var picked = dt && dt.files && dt.files[0];
-        if (picked) handleFile(picked);
+        if (dt && dt.files && dt.files.length) handleFiles(dt.files);
       });
       // 文件拖到上传框外面时，避免浏览器直接打开文件
       document.addEventListener("dragover", function (ev) {
@@ -980,8 +1053,7 @@
       }
       if (extractUrlBtn) extractUrlBtn.disabled = true;
       var opts = extractOptions();
-      hidePreview();
-      setExtractStatus(opts.limit ? "正在读取网页并提炼正文…" : "正在读取网页正文…");
+      setExtractStatus(opts.limit ? "正在读取网页并分析总结…" : "正在读取网页正文…");
       try {
         var res = await apiPost("/api/extract-url", {
           url: url,
@@ -991,6 +1063,7 @@
         });
         var data = await res.json();
         showPreview(data, "链接正文");
+        setExtractStatus("已抓取并分析链接正文：" + data.chars + " 字，确认后填入输入框");
         extractUrl.value = "";
       } catch (err) {
         setExtractStatus(err.message || "读取失败，请稍后重试", true);
