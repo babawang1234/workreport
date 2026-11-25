@@ -18,21 +18,23 @@
 - 账号体系：兑换码 `code` 就是账号；`reports` 表已按 `code` 存历史报告（`core/store.py`）
 - 生成接口：`webapp/main.py` 的 `api_generate`；微调 `api_refine`；语音 `api_transcribe`
 
-## 已完成（截至 2026-11-24）
+## 已完成（截至 2026-11-25）
 
 - 语音输入：按住说话转文字，含采样率优化（16kHz）、提示音 + 振动、识别后自动生成开关、按钮 UI 升级（更大/光泽/动画）
 - 首页「特点与优势」模块（精简为一行图标 + 短词）
 - 全站标题字体统一（字重 700 / 字距 -0.018em）
+- 记忆衔接：写周报自动衔接上一期计划（`link_prev` + `plan_section_of`），报告页一键汇总月报 / 季度总结（`/api/aggregate`）
+- 文件上传提炼：Word / Excel / PPT / PDF / 截图 / 网页链接 → 自动转成素材写入输入框（`core/extract.py`、`/api/extract`、`/api/extract-url`）
 
 ## 待办（下一步，按优先级）
 
-1. **记忆衔接**：写周报自动衔接上周计划 + 一键汇总月报/季报
-   - 基础设施已具备（`reports` 表已按账号存历史报告），只差在生成时把历史报告注入 prompt
-2. **文件上传提炼**：word / excel / ppt / pdf / 截图 / 推文链接 → 自动提炼成周报
-3. **第三方集成**：飞书 / 钉钉 / Notion 数据接入（OAuth，用户确认三个都要）
+1. **第三方集成**：飞书 / 钉钉 / 企业微信群机器人推送（需要用户提供 webhook 地址；个人微信 / QQ 无官方接口，不做）
+2. 继续 SEO 长尾页与收录观察
+
 
 ## 部署要点
 
 - 平台：Render，serviceId `srv-dc1vvbks728c73djvie0`，域名 zhibaozb.top，GitHub 仓库 `babawang1234/workreport`
 - 改代码后流程：`git push` → Render 后台 → Manual Deploy → Deploy latest commit（手动部署，push 不自动触发）
+- 线上依赖以 `requirements-web.txt` 为准（`render.yaml` 的 buildCommand），本地依赖见 `requirements.txt`；新增服务端依赖两个文件都要补
 - 语音录音仅在 HTTPS 下可用；iOS 微信内核不支持 Web 录音，需提示用户改用系统浏览器
