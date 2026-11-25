@@ -7,7 +7,7 @@ import io
 import re
 
 MAX_CHARS = 6000
-MAX_BYTES = 40 * 1024 * 1024
+MAX_BYTES = 100 * 1024 * 1024
 MAX_MB = MAX_BYTES // (1024 * 1024)
 
 

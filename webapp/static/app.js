@@ -904,33 +904,70 @@
       });
     }
 
+    var handleFile = async function (picked) {
+      if (!picked || !briefEl) return;
+      var opts = extractOptions();
+      hidePreview();
+      var file = picked;
+      if (picked.type && picked.type.indexOf("image/") === 0 && picked.size > 1.5 * 1024 * 1024) {
+        setExtractStatus("图片较大，正在自动压缩…");
+        file = await compressImage(picked);
+      }
+      setExtractStatus(opts.limit ? "正在解析并提炼「" + file.name + "」…" : "正在解析「" + file.name + "」…");
+      var fd = new FormData();
+      fd.append("file", file);
+      fd.append("limit", String(opts.limit));
+      fd.append("position", opts.position);
+      fd.append("report_type", opts.report_type);
+      try {
+        var res = await fetch("/api/extract", { method: "POST", body: fd });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(data.detail || "解析失败（" + res.status + "）");
+        showPreview(data, "文件");
+      } catch (err) {
+        setExtractStatus(err.message || "解析失败，请稍后重试", true);
+      } finally {
+        if (extractFile) extractFile.value = "";
+      }
+    };
+
     if (extractFile && briefEl) {
-      extractFile.addEventListener("change", async function () {
+      extractFile.addEventListener("change", function () {
         var picked = extractFile.files && extractFile.files[0];
-        if (!picked) return;
-        var opts = extractOptions();
-        hidePreview();
-        var file = picked;
-        if (picked.type && picked.type.indexOf("image/") === 0 && picked.size > 1.5 * 1024 * 1024) {
-          setExtractStatus("图片较大，正在自动压缩…");
-          file = await compressImage(picked);
+        if (picked) handleFile(picked);
+      });
+    }
+
+    /* 拖拽上传 */
+    var dropZone = $("#extract-drop");
+    if (dropZone) {
+      var markOver = function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        dropZone.classList.add("over");
+      };
+      var clearOver = function (ev) {
+        if (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
         }
-        setExtractStatus(opts.limit ? "正在解析并提炼「" + file.name + "」…" : "正在解析「" + file.name + "」…");
-        var fd = new FormData();
-        fd.append("file", file);
-        fd.append("limit", String(opts.limit));
-        fd.append("position", opts.position);
-        fd.append("report_type", opts.report_type);
-        try {
-          var res = await fetch("/api/extract", { method: "POST", body: fd });
-          var data = await res.json().catch(function () { return {}; });
-          if (!res.ok) throw new Error(data.detail || "解析失败（" + res.status + "）");
-          showPreview(data, "文件");
-        } catch (err) {
-          setExtractStatus(err.message || "解析失败，请稍后重试", true);
-        } finally {
-          extractFile.value = "";
-        }
+        dropZone.classList.remove("over");
+      };
+      ["dragenter", "dragover"].forEach(function (name) { dropZone.addEventListener(name, markOver); });
+      ["dragleave", "dragend"].forEach(function (name) { dropZone.addEventListener(name, clearOver); });
+      dropZone.addEventListener("drop", function (ev) {
+        clearOver(ev);
+        var dt = ev.dataTransfer;
+        var picked = dt && dt.files && dt.files[0];
+        if (picked) handleFile(picked);
+      });
+      // 文件拖到上传框外面时，避免浏览器直接打开文件
+      document.addEventListener("dragover", function (ev) {
+        var types = (ev.dataTransfer && ev.dataTransfer.types) || [];
+        if (Array.prototype.indexOf.call(types, "Files") >= 0) ev.preventDefault();
+      });
+      document.addEventListener("drop", function (ev) {
+        if (ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) ev.preventDefault();
       });
     }
 

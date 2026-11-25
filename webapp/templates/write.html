@@ -87,44 +87,43 @@
         </div>
       </details>
 
-      <details class="inbox" id="import-box">
-        <summary><span>导入素材：Word / Excel / PPT / PDF / 截图 / 链接</span><b>自动提炼</b></summary>
-        <div class="inbox-body">
-          <div class="extract-row">
-            <label class="extract-limit">
-              <span>提炼字数</span>
-              <select id="extract-limit">
-                <option value="200">精简 · 200 字</option>
-                <option value="400" selected>标准 · 400 字</option>
-                <option value="800">详细 · 800 字</option>
-                <option value="0">不提炼 · 用原文</option>
-              </select>
-            </label>
-            <span class="muted small">按上限把素材归纳成要点，字数越少越精简</span>
+      <section class="import-panel" id="import-box">
+        <div class="import-head">
+          <div>
+            <b>导入素材，自动提炼要点</b>
+            <p class="muted small">Word、Excel、PPT、PDF、截图、网页链接丢进来，先提炼再确认</p>
           </div>
-          <div class="extract-row">
-            <label class="btn ghost sm extract-pick">
-              <input type="file" id="extract-file" accept=".docx,.xlsx,.pptx,.pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp">
-              <span>选择文件</span>
-            </label>
-            <span class="muted small">上传后先提炼要点，确认后再填入；大图会自动压缩</span>
-          </div>
-          <div class="inline-form">
-            <input type="url" id="extract-url" placeholder="粘贴网页链接，自动抓取正文">
-            <button type="button" class="btn sm" id="extract-url-btn">读取链接</button>
-          </div>
-          <p class="muted small extract-status" id="extract-status"></p>
-          <div class="extract-preview hidden" id="extract-preview">
-            <p class="extract-preview-head" id="extract-preview-head"></p>
-            <textarea id="extract-preview-text" rows="6" placeholder="提炼结果会显示在这里"></textarea>
-            <div class="extract-preview-actions">
-              <button type="button" class="btn primary sm" id="extract-preview-apply">采用并填入</button>
-              <button type="button" class="btn ghost sm" id="extract-preview-retry">按当前字数重试</button>
-              <button type="button" class="btn ghost sm" id="extract-preview-cancel">取消</button>
-            </div>
+          <label class="extract-limit">
+            <span>提炼字数</span>
+            <select id="extract-limit">
+              <option value="200">精简 · 200 字</option>
+              <option value="400" selected>标准 · 400 字</option>
+              <option value="800">详细 · 800 字</option>
+              <option value="0">不提炼 · 用原文</option>
+            </select>
+          </label>
+        </div>
+        <label class="dropzone" id="extract-drop">
+          <input type="file" id="extract-file" accept=".docx,.xlsx,.pptx,.pdf,.txt,.md,.csv,.png,.jpg,.jpeg,.webp">
+          <span class="dropzone-icon" aria-hidden="true">⇪</span>
+          <b class="dropzone-title">拖拽文件到这里，或点击选择</b>
+          <span class="muted small">支持 Word / Excel / PPT / PDF / 截图 / txt / md / csv，大图自动压缩</span>
+        </label>
+        <div class="import-link">
+          <input type="url" id="extract-url" placeholder="或粘贴网页链接，自动抓取正文">
+          <button type="button" class="btn sm" id="extract-url-btn">读取链接</button>
+        </div>
+        <p class="muted small extract-status" id="extract-status"></p>
+        <div class="extract-preview hidden" id="extract-preview">
+          <p class="extract-preview-head" id="extract-preview-head"></p>
+          <textarea id="extract-preview-text" rows="6" placeholder="提炼结果会显示在这里"></textarea>
+          <div class="extract-preview-actions">
+            <button type="button" class="btn primary sm" id="extract-preview-apply">采用并填入</button>
+            <button type="button" class="btn ghost sm" id="extract-preview-retry">按当前字数重试</button>
+            <button type="button" class="btn ghost sm" id="extract-preview-cancel">取消</button>
           </div>
         </div>
-      </details>
+      </section>
 
       <div class="grid-2">
         <label class="field">
