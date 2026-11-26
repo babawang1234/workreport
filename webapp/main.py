@@ -1260,6 +1260,18 @@ def admin_login(request: Request, username: str = Form(""), password: str = Form
         response.set_cookie(
             ADMIN_COOKIE, token, max_age=ADMIN_MAX_AGE, httponly=True, samesite="lax", path="/"
         )
+        # 一步登录：同时发一张固定测试账号的会话，进站即为无限额度，不用再激活一次
+        if settings.test_code:
+            user_token = "adm_" + _admin_sig(settings.admin_user, ts)[:24]
+            if store.activate(settings.test_code, user_token).ok:
+                response.set_cookie(
+                    COOKIE_NAME,
+                    user_token,
+                    max_age=COOKIE_MAX_AGE,
+                    httponly=True,
+                    samesite="lax",
+                    path="/",
+                )
         return response
     return RedirectResponse(ADMIN_BASE + "?err=用户名或密码错误", status_code=303)
 
@@ -1268,6 +1280,7 @@ def admin_login(request: Request, username: str = Form(""), password: str = Form
 def admin_logout():
     response = RedirectResponse(ADMIN_BASE, status_code=303)
     response.delete_cookie(ADMIN_COOKIE, path="/")
+    response.delete_cookie(COOKIE_NAME, path="/")
     return response
 
 
