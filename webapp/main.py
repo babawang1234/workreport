@@ -597,6 +597,28 @@ def _cut_text(text: str, limit: int) -> str:
     return clipped.rstrip("，、；;")
 
 
+def _split_bullets(text: str) -> str:
+    """把「- 」条目里被合并的多件事拆开：按句号/分号切分，一条一件事。"""
+    out: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("- "):
+            out.append(line)
+            continue
+        body = stripped[2:].strip()
+        parts = [p.strip() for p in re.split(r"(?<=[。；])", body)]
+        parts = [p for p in parts if p and p.strip("。；; ")]
+        for part in parts:
+            part = part.rstrip("；;").strip()
+            if len(part) < 6 and out and out[-1].startswith("- "):
+                out[-1] = out[-1] + part
+                continue
+            if not part.endswith(("。", "！", "？")):
+                part += "。"
+            out.append("- " + part)
+    return "\n".join(out)
+
+
 def _summarize_material(text: str, limit: int, position: str, report_type: str) -> tuple[str, bool, str]:
     """把素材提炼成 limit 字以内的要点，返回 (正文, 是否已提炼, 失败原因)。"""
     limit = max(0, min(1200, int(limit or 0)))
@@ -728,6 +750,7 @@ async def api_organize(request: Request):
     if out.endswith("```"):
         out = out[:-3]
     out = "\n".join(re.sub(r"^#{1,6}\s*", "", line).replace("**", "") for line in out.strip().splitlines())
+    out = _split_bullets(out)
     if not out:
         raise HTTPException(status_code=502, detail="模型没有返回内容，请稍后重试")
     return {"text": out, "chars": len(out)}
